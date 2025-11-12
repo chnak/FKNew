@@ -1,0 +1,258 @@
+import { Timeline } from './Timeline.js';
+import { Renderer } from './Renderer.js';
+import { BackgroundLayer } from '../layers/BackgroundLayer.js';
+import { ElementLayer } from '../layers/ElementLayer.js';
+import { OverlayLayer } from '../layers/OverlayLayer.js';
+import { DEFAULT_CONFIG } from '../types/constants.js';
+import { deepMerge } from '../utils/helpers.js';
+import { generateId } from '../utils/helpers.js';
+
+/**
+ * 视频制作器主类
+ */
+export class VideoMaker {
+  constructor(config = {}) {
+    this.id = generateId('composition');
+    this.config = deepMerge({}, DEFAULT_CONFIG, config);
+    this.width = this.config.width;
+    this.height = this.config.height;
+    this.fps = this.config.fps;
+    this.backgroundColor = this.config.backgroundColor;
+    this.duration = this.config.duration;
+    
+    // 时间范围控制
+    this.startTime = config.startTime !== undefined ? config.startTime : 0;
+    this.endTime = config.endTime !== undefined ? config.endTime : undefined;
+    
+    // 如果指定了endTime但没有duration，自动计算duration
+    if (this.endTime !== undefined && this.duration === undefined) {
+      this.duration = this.endTime - this.startTime;
+    }
+    
+    // 如果指定了duration但没有endTime，自动计算endTime
+    if (this.duration !== undefined && this.endTime === undefined) {
+      this.endTime = this.startTime + this.duration;
+    }
+
+    // 创建时间线
+    this.timeline = new Timeline({
+      duration: this.duration,
+      fps: this.fps,
+    });
+
+    // 创建渲染器
+    this.renderer = new Renderer({
+      width: this.width,
+      height: this.height,
+      fps: this.fps,
+      quality: this.config.renderQuality,
+    });
+
+    // 图层管理
+    this.layers = [];
+    this.backgroundLayer = null;
+
+    // 初始化背景图层
+    this.initBackgroundLayer();
+  }
+
+  /**
+   * 初始化背景图层
+   */
+  initBackgroundLayer() {
+    this.backgroundLayer = new BackgroundLayer({
+      backgroundColor: this.backgroundColor,
+      zIndex: -9999,
+    });
+    this.backgroundLayer.initBackground(this.width, this.height);
+    this.addLayer(this.backgroundLayer);
+  }
+
+  /**
+   * 设置尺寸
+   */
+  setSize(width, height) {
+    this.width = width;
+    this.height = height;
+    this.config.width = width;
+    this.config.height = height;
+    this.renderer.setSize(width, height);
+    if (this.backgroundLayer) {
+      this.backgroundLayer.initBackground(width, height);
+    }
+  }
+
+  /**
+   * 设置背景颜色
+   */
+  setBackgroundColor(color) {
+    this.backgroundColor = color;
+    this.config.backgroundColor = color;
+    if (this.backgroundLayer) {
+      this.backgroundLayer.setBackgroundColor(color);
+    }
+  }
+
+  /**
+   * 设置持续时间
+   */
+  setDuration(duration) {
+    this.duration = duration;
+    this.config.duration = duration;
+    this.timeline.setDuration(duration);
+    
+    // 更新endTime
+    if (this.endTime !== undefined) {
+      this.endTime = this.startTime + duration;
+    }
+  }
+
+  /**
+   * 设置时间范围
+   * @param {number} startTime - 开始时间（秒）
+   * @param {number} endTime - 结束时间（秒），如果未指定则使用duration计算
+   */
+  setTimeRange(startTime, endTime) {
+    this.startTime = startTime;
+    if (endTime !== undefined) {
+      this.endTime = endTime;
+      this.duration = endTime - startTime;
+      this.config.duration = this.duration;
+      this.timeline.setDuration(this.duration);
+    } else if (this.duration !== undefined) {
+      this.endTime = startTime + this.duration;
+    }
+  }
+
+  /**
+   * 判断合成在指定时间是否激活
+   * @param {number} time - 时间（秒）
+   * @returns {boolean}
+   */
+  isActiveAtTime(time) {
+    if (this.endTime === undefined) {
+      return time >= this.startTime;
+    }
+    return time >= this.startTime && time <= this.endTime;
+  }
+
+  /**
+   * 添加图层
+   */
+  addLayer(layer) {
+    if (!this.layers.includes(layer)) {
+      this.layers.push(layer);
+      this.timeline.addLayer(layer);
+    }
+  }
+
+  /**
+   * 移除图层
+   */
+  removeLayer(layer) {
+    const index = this.layers.indexOf(layer);
+    if (index > -1) {
+      this.layers.splice(index, 1);
+      this.timeline.removeLayer(layer);
+    }
+  }
+
+  /**
+   * 获取所有图层
+   */
+  getLayers() {
+    return [...this.layers];
+  }
+
+  /**
+   * 创建元素图层
+   */
+  createElementLayer(config = {}) {
+    const layer = new ElementLayer(config);
+    this.addLayer(layer);
+    return layer;
+  }
+
+  /**
+   * 创建叠加图层
+   */
+  createOverlayLayer(config = {}) {
+    const layer = new OverlayLayer(config);
+    this.addLayer(layer);
+    return layer;
+  }
+
+  /**
+   * 渲染一帧
+   * @param {number} time - 时间（秒）
+   */
+  async renderFrame(time) {
+    await this.renderer.init();
+    const canvas = await this.renderer.renderFrame(this.timeline.getLayers(), time, this.backgroundColor);
+    return canvas;
+  }
+
+  /**
+   * 获取当前帧的 Canvas 缓冲区
+   */
+  getFrameBuffer(time) {
+    return this.renderer.getCanvasBuffer();
+  }
+
+  /**
+   * 播放合成（预览）
+   */
+  async play() {
+    this.timeline.play();
+    // 这里可以实现预览逻辑
+  }
+
+  /**
+   * 暂停
+   */
+  pause() {
+    this.timeline.pause();
+  }
+
+  /**
+   * 停止
+   */
+  stop() {
+    this.timeline.stop();
+  }
+
+  /**
+   * 跳转到指定时间
+   */
+  seek(time) {
+    this.timeline.seek(time);
+  }
+
+  /**
+   * 导出视频
+   * @param {string} outputPath - 输出路径
+   * @param {Object} options - 选项
+   */
+  async export(outputPath, options = {}) {
+    const { VideoExporter } = await import('./VideoExporter.js');
+    const exporter = new VideoExporter({
+      fps: this.fps,
+      quality: this.config.renderQuality,
+      ...options,
+    });
+    return await exporter.export(this, outputPath, options);
+  }
+
+  /**
+   * 销毁合成
+   */
+  destroy() {
+    this.layers.forEach(layer => layer.destroy());
+    this.layers = [];
+    if (this.renderer) {
+      this.renderer.destroy();
+    }
+    this.timeline.reset();
+  }
+}
+

@@ -1,0 +1,62 @@
+{
+  "name": "FKvideo-spritejs",
+  "version": "1.0.3",
+  "description": "基于 Creatomate 配置结构的视频制作库，使用 SpriteJS 渲染引擎",
+  "main": "index.cjs",
+  "module": "index.js",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "require": "./index.cjs"
+    }
+  },
+  "scripts": {
+    "start": "node examples/basic-composition.js",
+    "example:basic": "node examples/basic-composition.js",
+    "example:text": "node examples/text-animation.js",
+    "example:image": "node examples/image-slideshow.js",
+    "test": "node test-spritejs-basic.js"
+  },
+  "keywords": [
+    "video",
+    "animation",
+    "canvas",
+    "spritejs",
+    "webgl",
+    "ffmpeg",
+    "creatomate",
+    "editly"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^3.2.0",
+    "execa": "^9.6.0",
+    "font-finder": "^1.1.0",
+    "font-list": "^2.0.1",
+    "fs-extra": "^11.2.0",
+    "gl": "^8.1.6",
+    "gl-buffer": "^2.1.2",
+    "gl-shader": "^4.3.1",
+    "gl-texture2d": "^2.1.0",
+    "gl-transition": "^1.13.0",
+    "gl-transitions": "^1.43.0",
+    "lrc-kit": "^1.1.1",
+    "nanoid": "^5.0.4",
+    "spritejs": "^3.8.3",
+    "zod": "^4.1.12"
+  },
+  "overrides": {
+    "canvas": "^3.2.0"
+  },
+  "resolutions": {
+    "**/canvas": "^3.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

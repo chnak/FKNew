@@ -1,0 +1,81 @@
+基于 Node.js + SpriteJS 的纯 JavaScript 视频制作库方案：
+
+## 项目方案
+
+### 核心概念
+- **Composition**: 视频合成容器，管理图层和动画时间线
+- **Layer**: 图层，承载视觉元素
+- **Element**: 视觉元素（文本、图片、形状等）
+- **Timeline**: 时间线管理动画和元素生命周期
+- **Renderer**: 渲染器，负责帧渲染和视频输出
+
+### 技术栈
+- **Node.js**: 运行时环境
+- **SpriteJS**: 2D 图形渲染
+- **FFmpeg**: 视频编码
+- **Canvas**: 离屏渲染
+- **Jest**: 测试框架
+
+## 目录结构
+
+```
+video-composition-engine/
+├── package.json
+├── .gitignore
+├── README.md
+├── docs/                           # 文档
+│   ├── getting-started.md
+│   ├── api-reference.md
+│   └── examples/
+├── examples/                       # 使用示例
+│   ├── basic-composition.js
+│   ├── text-animation.js
+│   └── image-slideshow.js
+├── src/
+│   ├── index.js                    # 主入口文件
+│   ├── core/
+│   │   ├── Composition.js          # 合成器主类
+│   │   ├── Layer.js               # 图层基类
+│   │   ├── Timeline.js            # 时间线管理
+│   │   ├── Renderer.js            # 渲染器
+│   │   └── VideoExporter.js       # 视频导出
+│   ├── elements/
+│   │   ├── BaseElement.js         # 元素基类
+|   |   ├── CompositionElement.js  # 合成元素（新增）
+│   │   ├── TextElement.js         # 文本元素
+│   │   ├── ImageElement.js        # 图片元素
+│   │   ├── RectElement.js         # 矩形元素
+│   │   ├── CircleElement.js       # 圆形元素
+│   │   └── SpriteElement.js       # SpriteJS 精灵元素
+│   ├── layers/
+│   │   ├── BaseLayer.js           # 图层基类
+│   │   ├── ElementLayer.js        # 元素图层
+│   │   ├── BackgroundLayer.js     # 背景图层
+│   │   └── OverlayLayer.js        # 叠加图层
+│   ├── animations/
+│   │   ├── Animation.js           # 动画基类
+│   │   ├── KeyframeAnimation.js   # 关键帧动画
+│   │   ├── TransformAnimation.js  # 变换动画
+│   │   ├── FadeAnimation.js       # 淡入淡出动画
+│   │   └── MoveAnimation.js       # 移动动画
+│   ├── utils/
+│   │   ├── helpers.js             # 工具函数
+│   │   ├── ffmpeg.js              # FFmpeg 工具
+│   │   ├── image-loader.js        # 图片加载器
+│   │   └── validator.js           # 参数验证
+│   └── types/
+│       ├── constants.js           # 常量定义
+│       └── enums.js               # 枚举类型
+├── tests/                          # 测试文件
+│   ├── unit/
+│   │   ├── core/
+│   │   ├── elements/
+│   │   └── animations/
+│   └── integration/
+│       ├── composition.test.js
+│       └── export.test.js
+├── config/                         # 配置文件
+│   ├── default.js                 # 默认配置
+│   └── development.js             # 开发环境配置
+└── dist/                          # 构建输出目录
+```
