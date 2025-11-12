@@ -12,6 +12,7 @@ export class Animation {
     this.config = deepMerge({}, DEFAULT_ANIMATION_CONFIG, config);
     this.target = null; // 目标元素
     // startTime 优先使用 config.startTime，如果没有则使用 delay
+    // 注意：delay 可能是负数，负数 delay 会在 BaseElement 中从元素结束时间计算
     this.startTime = config.startTime !== undefined ? config.startTime : (this.config.delay || 0);
     this.endTime = this.startTime + this.config.duration;
     this.iterations = this.config.iterations || 1;

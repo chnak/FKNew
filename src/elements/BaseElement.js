@@ -7,14 +7,47 @@ import { MoveAnimation } from '../animations/MoveAnimation.js';
 import { TransformAnimation } from '../animations/TransformAnimation.js';
 import { KeyframeAnimation } from '../animations/KeyframeAnimation.js';
 import { AnimationType } from '../types/enums.js';
+import { getPresetAnimation } from '../animations/preset-animations.js';
 
 /**
  * 根据动画配置创建动画实例
+ * 支持字符串形式的预设动画名称，如 "fadeIn", "fadeOut"
+ * 也支持对象形式的配置，如 {type: "fadeIn", duration: 1, delay: 2}
  */
 function createAnimationFromConfig(animConfig) {
   // 如果已经是动画实例，直接返回
   if (animConfig && typeof animConfig.getStateAtTime === 'function') {
     return animConfig;
+  }
+
+  // 如果是字符串，尝试获取预设动画
+  if (typeof animConfig === 'string') {
+    const preset = getPresetAnimation(animConfig);
+    if (preset) {
+      // 使用预设动画的默认配置
+      return createAnimationFromConfig(preset);
+    } else {
+      console.warn(`未找到预设动画: ${animConfig}`);
+      // 如果找不到预设，返回一个默认的淡入动画
+      return new FadeAnimation({ fromOpacity: 0, toOpacity: 1 });
+    }
+  }
+
+  // 如果是对象，检查是否有预设动画名称
+  if (animConfig && typeof animConfig === 'object') {
+    // 检查 type 是否是预设动画名称
+    const presetName = animConfig.type || animConfig.animationType;
+    const preset = getPresetAnimation(presetName);
+    
+    if (preset) {
+      // 合并预设配置和用户配置（用户配置优先级更高）
+      const mergedConfig = { ...preset, ...animConfig };
+      // 移除 type，因为预设配置中已经有 type
+      delete mergedConfig.type;
+      delete mergedConfig.animationType;
+      // 使用合并后的配置创建动画
+      return createAnimationFromConfig(mergedConfig);
+    }
   }
 
   // 从配置对象创建动画
@@ -227,10 +260,26 @@ export class BaseElement {
 
     // 应用所有动画
     // 注意：动画的 startTime 是相对于元素自己的 startTime 的
-    // 所以需要将全局时间转换为相对于元素的时间
+    // 如果 delay 为负数，则从元素的结束时间往前计算
     for (const animation of this.animations) {
-      // 动画的绝对开始时间 = 元素的开始时间 + 动画的相对开始时间
-      const animationAbsoluteStartTime = this.startTime + animation.startTime;
+      // 获取动画的 delay（可能是负数）
+      const delay = animation.config.delay !== undefined ? animation.config.delay : 0;
+      
+      // 计算动画的绝对开始时间
+      let animationAbsoluteStartTime;
+      if (delay < 0) {
+        // 负数 delay：从元素结束时间往前计算
+        // 例如：delay = -1，duration = 2，元素结束时间是 10
+        // 动画开始时间 = 10 - 1 - 2 = 7（确保动画在元素结束前完成）
+        // 或者更简单：动画开始时间 = 元素结束时间 + delay - duration
+        // 但通常我们希望动画在元素结束前完成，所以：
+        // 动画开始时间 = 元素结束时间 + delay
+        animationAbsoluteStartTime = this.endTime + delay;
+      } else {
+        // 正数或0 delay：从元素开始时间往后计算
+        animationAbsoluteStartTime = this.startTime + (animation.startTime || delay);
+      }
+      
       const animationAbsoluteEndTime = animationAbsoluteStartTime + animation.config.duration;
       
       // 检查动画是否在激活状态（使用绝对时间）
