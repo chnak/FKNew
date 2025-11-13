@@ -409,11 +409,35 @@ export class TextElement extends BaseElement {
         baseY = baseY - totalHeight;
       }
       
-      // 最终位置 = 基准位置 + 片段偏移
+      // 最终位置 = 基准位置 + 片段偏移 + 动画偏移（如果有）
       const offsetX = this.config.segmentOffsetX !== undefined ? this.config.segmentOffsetX : 0;
       const offsetY = this.config.segmentOffsetY !== undefined ? this.config.segmentOffsetY : 0;
-      x = baseX + offsetX;
-      y = baseY + offsetY;
+      
+      // 应用动画的位置偏移
+      // 对于分割文本，this.config.x 和 this.config.y 应该和 parentX/parentY 一样
+      // state.x 和 state.y 已经包含了动画的偏移（translateX/translateY 已转换为绝对位置）
+      // 需要计算相对于父元素原始位置的偏移量
+      const originalConfigX = typeof this.config.x === 'string' 
+        ? toPixels(this.config.x, context, 'x')
+        : (this.config.x || 0);
+      const originalConfigY = typeof this.config.y === 'string'
+        ? toPixels(this.config.y, context, 'y')
+        : (this.config.y || 0);
+      
+      // 获取动画后的位置（state.x 和 state.y 已经包含了动画偏移）
+      const animatedX = (state.x !== undefined && typeof state.x === 'number') 
+        ? state.x 
+        : originalConfigX;
+      const animatedY = (state.y !== undefined && typeof state.y === 'number')
+        ? state.y
+        : originalConfigY;
+      
+      // 计算动画偏移量（相对于元素原始位置）
+      const animOffsetX = animatedX - originalConfigX;
+      const animOffsetY = animatedY - originalConfigY;
+      
+      x = baseX + offsetX + animOffsetX;
+      y = baseY + offsetY + animOffsetY;
     } else {
       // 普通元素，转换位置单位
       x = state.x;
