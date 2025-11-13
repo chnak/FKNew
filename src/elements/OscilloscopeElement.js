@@ -28,7 +28,7 @@ export class OscilloscopeElement extends BaseElement {
     this.lineWidth = config.lineWidth || 2; // 线条宽度
     this.smoothing = config.smoothing !== undefined ? config.smoothing : 0.3; // 平滑度 (0-1)
     this.mirror = config.mirror !== undefined ? config.mirror : true; // 是否镜像显示
-    this.style = config.style || 'line'; // 样式: 'line', 'bars', 'circle', 'spectrum', 'particles'
+    this.style = config.style || 'line'; // 样式: 'line', 'bars', 'circle', 'spectrum', 'particles', 'waterfall', 'spiral', 'ripple', 'grid', 'explosion'
     this.barWidth = config.barWidth || 2; // 柱状图宽度（当 style 为 'bars' 时）
     this.barGap = config.barGap || 1; // 柱状图间距
     this.sensitivity = config.sensitivity !== undefined ? config.sensitivity : 1.0; // 灵敏度
@@ -46,6 +46,25 @@ export class OscilloscopeElement extends BaseElement {
     ];
     this.particleTrail = config.particleTrail !== undefined ? config.particleTrail : true; // 是否显示拖尾效果
     this.particleTrailLength = config.particleTrailLength || 5; // 拖尾长度
+    
+    // 瀑布图样式配置
+    this.waterfallHeight = config.waterfallHeight || 200; // 瀑布图高度
+    this.waterfallBands = config.waterfallBands || 64; // 频段数量
+    
+    // 螺旋样式配置
+    this.spiralTurns = config.spiralTurns || 3; // 螺旋圈数
+    this.spiralRadius = config.spiralRadius || 200; // 螺旋半径
+    
+    // 涟漪样式配置
+    this.rippleCount = config.rippleCount || 5; // 涟漪数量
+    this.rippleSpeed = config.rippleSpeed || 1.0; // 涟漪速度
+    
+    // 网格样式配置
+    this.gridRows = config.gridRows || 8; // 网格行数
+    this.gridCols = config.gridCols || 16; // 网格列数
+    
+    // 爆炸样式配置
+    this.explosionParticles = config.explosionParticles || 100; // 爆炸粒子数
     
     // 音频数据
     this.audioData = null; // 解析后的音频波形数据
@@ -287,6 +306,21 @@ export class OscilloscopeElement extends BaseElement {
       case 'particles':
       case 'dots':
         this.renderParticles(waveformData, rectX, rectY, width, height);
+        break;
+      case 'waterfall':
+        this.renderWaterfall(waveformData, rectX, rectY, width, height, time);
+        break;
+      case 'spiral':
+        this.renderSpiral(waveformData, rectX, rectY, width, height);
+        break;
+      case 'ripple':
+        this.renderRipple(waveformData, rectX, rectY, width, height, time);
+        break;
+      case 'grid':
+        this.renderGrid(waveformData, rectX, rectY, width, height);
+        break;
+      case 'explosion':
+        this.renderExplosion(waveformData, rectX, rectY, width, height);
         break;
       case 'line':
       default:
@@ -573,6 +607,239 @@ export class OscilloscopeElement extends BaseElement {
         });
         circle.fillColor = color;
         circle.fillColor.alpha = 0.6;
+      }
+    }
+  }
+
+  /**
+   * 绘制瀑布图波形（频谱瀑布图效果）
+   */
+  renderWaterfall(data, x, y, width, height, time) {
+    const centerY = y + height / 2;
+    const barCount = this.waterfallBands;
+    const step = Math.max(1, Math.floor(data.length / barCount));
+    const barWidth = width / barCount;
+    const amplitude = (height / 2) * this.sensitivity;
+    
+    // 存储历史数据用于瀑布效果
+    if (!this.waterfallHistory) {
+      this.waterfallHistory = [];
+    }
+    
+    // 计算当前帧的频谱数据
+    const currentSpectrum = [];
+    for (let i = 0; i < barCount; i++) {
+      const dataIndex = i * step;
+      if (dataIndex >= data.length) break;
+      
+      let sumSquares = 0;
+      let count = 0;
+      for (let j = dataIndex; j < Math.min(dataIndex + step, data.length); j++) {
+        sumSquares += data[j] * data[j];
+        count++;
+      }
+      const rms = count > 0 ? Math.sqrt(sumSquares / count) : 0;
+      currentSpectrum.push(rms);
+    }
+    
+    // 添加到历史记录
+    this.waterfallHistory.unshift(currentSpectrum);
+    if (this.waterfallHistory.length > Math.floor(height / 2)) {
+      this.waterfallHistory.pop();
+    }
+    
+    // 绘制瀑布图（从下往上，从新到旧）
+    for (let row = 0; row < this.waterfallHistory.length; row++) {
+      const spectrum = this.waterfallHistory[row];
+      const rowY = centerY - row;
+      const alpha = 1 - (row / this.waterfallHistory.length) * 0.8;
+      
+      for (let i = 0; i < spectrum.length; i++) {
+        const barHeight = spectrum[i] * amplitude;
+        const barX = x + i * barWidth;
+        
+        // 根据强度选择颜色（从蓝到红）
+        const intensity = spectrum[i];
+        let color;
+        if (intensity < 0.33) {
+          color = new paper.Color(0, intensity * 3, 1);
+        } else if (intensity < 0.66) {
+          color = new paper.Color((intensity - 0.33) * 3, 1, 1 - (intensity - 0.33) * 3);
+        } else {
+          color = new paper.Color(1, 1 - (intensity - 0.66) * 3, 0);
+        }
+        
+        const bar = new paper.Path.Rectangle({
+          rectangle: new paper.Rectangle(barX, rowY, barWidth - 1, barHeight),
+          fillColor: color,
+        });
+        bar.fillColor.alpha = alpha;
+      }
+    }
+  }
+
+  /**
+   * 绘制螺旋波形
+   */
+  renderSpiral(data, x, y, width, height) {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const maxRadius = Math.min(width, height) / 2 - 20;
+    const pointCount = Math.min(data.length, 500);
+    
+    const path = new paper.Path();
+    path.strokeColor = this.waveColor;
+    path.strokeWidth = this.lineWidth;
+    
+    for (let i = 0; i < pointCount; i++) {
+      const progress = i / pointCount;
+      const angle = progress * Math.PI * 2 * this.spiralTurns;
+      const radius = maxRadius * progress * 0.8;
+      
+      const dataIndex = Math.floor(progress * data.length);
+      const amplitude = Math.abs(data[dataIndex]) * this.sensitivity;
+      const r = radius + amplitude * maxRadius * 0.2;
+      
+      const px = centerX + Math.cos(angle) * r;
+      const py = centerY + Math.sin(angle) * r;
+      
+      if (i === 0) {
+        path.moveTo(new paper.Point(px, py));
+      } else {
+        path.lineTo(new paper.Point(px, py));
+      }
+    }
+    
+    // 使用颜色数组的第一个颜色作为线条颜色
+    if (this.particleColors && this.particleColors.length > 0) {
+      path.strokeColor = this.particleColors[0];
+    }
+  }
+
+  /**
+   * 绘制涟漪波形（水波纹效果）
+   */
+  renderRipple(data, x, y, width, height, time) {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const maxRadius = Math.min(width, height) / 2;
+    
+    // 计算平均振幅
+    let avgAmplitude = 0;
+    for (let i = 0; i < data.length; i++) {
+      avgAmplitude += Math.abs(data[i]);
+    }
+    avgAmplitude = (avgAmplitude / data.length) * this.sensitivity;
+    
+    // 绘制多个涟漪圈
+    for (let i = 0; i < this.rippleCount; i++) {
+      const rippleProgress = (time * this.rippleSpeed + i / this.rippleCount) % 1;
+      const radius = maxRadius * rippleProgress;
+      const alpha = 1 - rippleProgress;
+      
+      if (alpha > 0) {
+        const circle = new paper.Path.Circle({
+          center: new paper.Point(centerX, centerY),
+          radius: radius + avgAmplitude * maxRadius * 0.3,
+        });
+        
+        circle.strokeColor = this.waveColor;
+        circle.strokeWidth = 3;
+        circle.strokeColor.alpha = alpha * 0.8;
+        circle.fillColor = 'transparent';
+      }
+    }
+    
+    // 中心点
+    const centerCircle = new paper.Path.Circle({
+      center: new paper.Point(centerX, centerY),
+      radius: 5 + avgAmplitude * 20,
+    });
+    centerCircle.fillColor = this.waveColor;
+    centerCircle.fillColor.alpha = 0.8;
+  }
+
+  /**
+   * 绘制网格波形
+   */
+  renderGrid(data, x, y, width, height) {
+    const cellWidth = width / this.gridCols;
+    const cellHeight = height / this.gridRows;
+    const step = Math.max(1, Math.floor(data.length / (this.gridRows * this.gridCols)));
+    
+    let dataIndex = 0;
+    for (let row = 0; row < this.gridRows; row++) {
+      for (let col = 0; col < this.gridCols; col++) {
+        if (dataIndex >= data.length) break;
+        
+        const amplitude = Math.abs(data[dataIndex]) * this.sensitivity;
+        const cellX = x + col * cellWidth;
+        const cellY = y + row * cellHeight;
+        
+        // 根据振幅调整单元格大小和颜色
+        const scale = 0.5 + amplitude * 0.5;
+        const cellRect = new paper.Path.Rectangle({
+          rectangle: new paper.Rectangle(
+            cellX + cellWidth * (1 - scale) / 2,
+            cellY + cellHeight * (1 - scale) / 2,
+            cellWidth * scale,
+            cellHeight * scale
+          ),
+          fillColor: this.waveColor,
+        });
+        cellRect.fillColor.alpha = 0.3 + amplitude * 0.7;
+        
+        dataIndex += step;
+      }
+    }
+  }
+
+  /**
+   * 绘制爆炸波形（粒子从中心爆炸）
+   */
+  renderExplosion(data, x, y, width, height) {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const maxRadius = Math.min(width, height) / 2;
+    const particleCount = this.explosionParticles;
+    const step = Math.max(1, Math.floor(data.length / particleCount));
+    const colorStep = this.particleColors.length / particleCount;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const dataIndex = Math.min(i * step, data.length - 1);
+      const amplitude = Math.abs(data[dataIndex]) * this.sensitivity;
+      
+      // 计算粒子位置（从中心向外）
+      const angle = (i / particleCount) * Math.PI * 2;
+      const baseRadius = maxRadius * 0.3;
+      const radiusOffset = amplitude * maxRadius * 0.7;
+      const radius = baseRadius + radiusOffset;
+      
+      const px = centerX + Math.cos(angle) * radius;
+      const py = centerY + Math.sin(angle) * radius;
+      
+      // 粒子大小
+      const particleSize = 3 + amplitude * 12;
+      
+      // 选择颜色
+      const colorIndex = Math.floor(i * colorStep) % this.particleColors.length;
+      const color = this.particleColors[colorIndex];
+      
+      // 绘制粒子
+      const circle = new paper.Path.Circle({
+        center: new paper.Point(px, py),
+        radius: particleSize / 2,
+      });
+      circle.fillColor = color;
+      
+      // 添加拖尾（从中心到粒子）
+      if (amplitude > 0.2) {
+        const trail = new paper.Path();
+        trail.strokeColor = color;
+        trail.strokeWidth = particleSize * 0.2;
+        trail.strokeColor.alpha = 0.4;
+        trail.moveTo(new paper.Point(centerX, centerY));
+        trail.lineTo(new paper.Point(px, py));
       }
     }
   }

@@ -13,7 +13,7 @@ async function testOscilloscopeParticles() {
   console.log('=== 测试多彩圆点粒子示波器 ===\n');
 
   // 检查音频文件
-  const audioFile = path.join(__dirname, '../assets/离家出走.mp3');
+  const audioFile = path.join(__dirname, '../assets/星光背后.mp3');
   if (!await fs.pathExists(audioFile)) {
     console.error(`音频文件不存在: ${audioFile}`);
     console.log('请确保 assets 目录下有音频文件');
@@ -32,11 +32,11 @@ async function testOscilloscopeParticles() {
   const scene = track.createScene({ duration: 10 })
     .addBackground({ color: '#000000' })
     .addText({
-      text: "多种示波器样式展示",
+      text: "多种酷炫示波器样式展示",
       color: "#FFFFFF",
-      fontSize: 50,
+      fontSize: 45,
       x: "50%",
-      y: "8%",
+      y: "5%",
       textAlign: "center",
       duration: 10,
       startTime: 0,
@@ -46,10 +46,10 @@ async function testOscilloscopeParticles() {
   // 样式1: 线条波形（左上）
   await scene.addOscilloscope({
     audioPath: audioFile,
-    x: "25%",
-    y: "30%",
-    width: 400,
-    height: 200,
+    x: "20%",
+    y: "25%",
+    width: 350,
+    height: 180,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     waveColor: "#00ff00",
     style: 'line',
@@ -62,13 +62,13 @@ async function testOscilloscopeParticles() {
     zIndex: 1,
   });
 
-  // 样式2: 柱状波形（右上）
+  // 样式2: 柱状波形（中上）
   await scene.addOscilloscope({
     audioPath: audioFile,
-    x: "75%",
-    y: "30%",
-    width: 400,
-    height: 200,
+    x: "50%",
+    y: "25%",
+    width: 350,
+    height: 180,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     waveColor: "#00ffff",
     style: 'bars',
@@ -82,31 +82,13 @@ async function testOscilloscopeParticles() {
     zIndex: 1,
   });
 
-  // 样式3: 圆形波形（左下）
+  // 样式3: 频谱波形（右上）
   await scene.addOscilloscope({
     audioPath: audioFile,
-    x: "25%",
-    y: "70%",
-    width: 400,
-    height: 400,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    waveColor: "#ff00ff",
-    style: 'circle',
-    lineWidth: 2,
-    sensitivity: 1.5,
-    windowSize: 0.1,
-    duration: 10,
-    startTime: 0,
-    zIndex: 1,
-  });
-
-  // 样式4: 频谱波形（右下）
-  await scene.addOscilloscope({
-    audioPath: audioFile,
-    x: "75%",
-    y: "70%",
-    width: 400,
-    height: 200,
+    x: "80%",
+    y: "25%",
+    width: 350,
+    height: 180,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     waveColor: "#ffff00",
     style: 'spectrum',
@@ -118,13 +100,131 @@ async function testOscilloscopeParticles() {
     zIndex: 1,
   });
 
-  // 样式5: 多彩圆点粒子（中心）
+  // 样式4: 圆形波形（左中）
+  await scene.addOscilloscope({
+    audioPath: audioFile,
+    x: "20%",
+    y: "55%",
+    width: 300,
+    height: 300,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    waveColor: "#ff00ff",
+    style: 'circle',
+    lineWidth: 2,
+    sensitivity: 1.5,
+    windowSize: 0.1,
+    duration: 10,
+    startTime: 0,
+    zIndex: 1,
+  });
+
+  // 样式5: 螺旋波形（中中）
+  await scene.addOscilloscope({
+    audioPath: audioFile,
+    x: "50%",
+    y: "55%",
+    width: 300,
+    height: 300,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    waveColor: "#ff8000",
+    style: 'spiral',
+    spiralTurns: 3,
+    lineWidth: 2,
+    sensitivity: 1.5,
+    particleColors: [
+      '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+      '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+    ],
+    windowSize: 0.1,
+    duration: 10,
+    startTime: 0,
+    zIndex: 1,
+  });
+
+  // 样式6: 涟漪波形（右中）
+  await scene.addOscilloscope({
+    audioPath: audioFile,
+    x: "80%",
+    y: "55%",
+    width: 300,
+    height: 300,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    waveColor: "#00ffff",
+    style: 'ripple',
+    rippleCount: 5,
+    rippleSpeed: 1.0,
+    sensitivity: 1.5,
+    windowSize: 0.1,
+    duration: 10,
+    startTime: 0,
+    zIndex: 1,
+  });
+
+  // 样式7: 网格波形（左下）
+  await scene.addOscilloscope({
+    audioPath: audioFile,
+    x: "20%",
+    y: "85%",
+    width: 350,
+    height: 180,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    waveColor: "#80ff00",
+    style: 'grid',
+    gridRows: 8,
+    gridCols: 16,
+    sensitivity: 1.5,
+    windowSize: 0.1,
+    duration: 10,
+    startTime: 0,
+    zIndex: 1,
+  });
+
+  // 样式8: 爆炸波形（中下）
+  await scene.addOscilloscope({
+    audioPath: audioFile,
+    x: "50%",
+    y: "85%",
+    width: 350,
+    height: 350,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    style: 'explosion',
+    explosionParticles: 100,
+    sensitivity: 1.5,
+    particleColors: [
+      '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+      '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+      '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+    ],
+    windowSize: 0.1,
+    duration: 10,
+    startTime: 0,
+    zIndex: 1,
+  });
+
+  // 样式9: 瀑布图（右下）
+  await scene.addOscilloscope({
+    audioPath: audioFile,
+    x: "80%",
+    y: "85%",
+    width: 350,
+    height: 180,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    style: 'waterfall',
+    waterfallBands: 64,
+    sensitivity: 1.5,
+    windowSize: 0.1,
+    duration: 10,
+    startTime: 0,
+    zIndex: 1,
+  });
+
+  // 样式10: 多彩圆点粒子（中心大图）
   await scene.addOscilloscope({
     audioPath: audioFile,
     x: "50%",
     y: "50%",
-    width: 500,
-    height: 500,
+    width: 400,
+    height: 400,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     style: 'particles',
     mirror: true,
