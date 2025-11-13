@@ -83,18 +83,26 @@ async function testOscilloscope() {
     zIndex: 1,
   });
 
-  // 添加示波器 - 频谱样式
+  // 添加示波器 - 多彩圆点粒子样式
   await scene.addOscilloscope({
     audioPath: audioFile,
     x: '50%',
     y: '90%',
-    width: 1600,
-    height: 200,
-    waveColor: '#ff00ff',
+    width: 400,
+    height: 400,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    style: 'spectrum',
+    style: 'particles',
     mirror: true,
     sensitivity: 1.5,
+    particleCount: 60,
+    particleMinSize: 4,
+    particleMaxSize: 20,
+    particleColors: [
+      '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+      '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+      '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+    ],
+    particleTrail: true,
     windowSize: 0.1,
     startTime: 0,
     duration: 10,

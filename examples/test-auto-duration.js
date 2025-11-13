@@ -71,26 +71,32 @@ async function testAutoDuration() {
       ],
     });
 
-  // 添加示波器（音频可视化器）
-//   await scene.addOscilloscope({
-//     audioPath: audioFile,
-//     x: "50%",
-//     y: "50%",
-//     width: "90%",
-//     height: "40%",
-//     anchor: [0.5, 0.5], // 明确设置 anchor，确保位置正确
-//     waveColor: "#FFFFFF",
-//     backgroundColor: "rgba(0, 0, 0, 0.2)",
-//     lineWidth: 2,
-//     sensitivity: 1,
-//     style: 'line',
-//     mirror: true,
-//     smoothing: 0.3,
-//     windowSize: 0.1, // 显示窗口 0.1 秒
-//     duration: audioDurationNum,
-//     startTime: 0,
-//     zIndex: 0, // 降低 zIndex，确保在文本下方
-//   });
+  // 添加示波器（音频可视化器）- 多彩圆点粒子样式
+  await scene.addOscilloscope({
+    audioPath: audioFile,
+    x: "50%",
+    y: "50%",
+    width: 600,
+    height: 600,
+    anchor: [0.5, 0.5], // 明确设置 anchor，确保位置正确
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    style: 'particles',
+    mirror: true,
+    sensitivity: 1.5,
+    particleCount: 80,
+    particleMinSize: 5,
+    particleMaxSize: 25,
+    particleColors: [
+      '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+      '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+      '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+    ],
+    particleTrail: true,
+    windowSize: 0.1, // 显示窗口 0.1 秒
+    duration: audioDurationNum,
+    startTime: 0,
+    zIndex: 0, // 降低 zIndex，确保在文本下方
+  });
 
   // 添加音频
   scene.addAudio({

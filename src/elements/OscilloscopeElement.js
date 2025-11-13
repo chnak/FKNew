@@ -28,10 +28,24 @@ export class OscilloscopeElement extends BaseElement {
     this.lineWidth = config.lineWidth || 2; // 线条宽度
     this.smoothing = config.smoothing !== undefined ? config.smoothing : 0.3; // 平滑度 (0-1)
     this.mirror = config.mirror !== undefined ? config.mirror : true; // 是否镜像显示
-    this.style = config.style || 'line'; // 样式: 'line', 'bars', 'circle', 'spectrum'
+    this.style = config.style || 'line'; // 样式: 'line', 'bars', 'circle', 'spectrum', 'particles'
     this.barWidth = config.barWidth || 2; // 柱状图宽度（当 style 为 'bars' 时）
     this.barGap = config.barGap || 1; // 柱状图间距
     this.sensitivity = config.sensitivity !== undefined ? config.sensitivity : 1.0; // 灵敏度
+    
+    // 粒子/圆点样式配置
+    this.particleCount = config.particleCount || 50; // 圆点数量
+    this.particleMinSize = config.particleMinSize || 3; // 圆点最小尺寸
+    this.particleMaxSize = config.particleMaxSize || 15; // 圆点最大尺寸
+    this.particleColors = config.particleColors || [ // 圆点颜色数组（渐变色）
+      '#ff0080', '#ff0080', '#ff4080', '#ff4080',
+      '#ff8000', '#ff8000', '#ffc000', '#ffc000',
+      '#ffff00', '#ffff00', '#80ff00', '#80ff00',
+      '#00ff80', '#00ff80', '#00ffff', '#00ffff',
+      '#0080ff', '#0080ff', '#8000ff', '#8000ff',
+    ];
+    this.particleTrail = config.particleTrail !== undefined ? config.particleTrail : true; // 是否显示拖尾效果
+    this.particleTrailLength = config.particleTrailLength || 5; // 拖尾长度
     
     // 音频数据
     this.audioData = null; // 解析后的音频波形数据
@@ -266,6 +280,10 @@ export class OscilloscopeElement extends BaseElement {
       case 'spectrum':
         this.renderSpectrum(waveformData, rectX, rectY, width, height);
         break;
+      case 'particles':
+      case 'dots':
+        this.renderParticles(waveformData, rectX, rectY, width, height);
+        break;
       case 'line':
       default:
         this.renderLine(waveformData, rectX, rectY, width, height);
@@ -446,6 +464,111 @@ export class OscilloscopeElement extends BaseElement {
           ),
           fillColor: this.waveColor,
         });
+      }
+    }
+  }
+
+  /**
+   * 绘制粒子/圆点波形（多彩圆点随音律跳动）
+   */
+  renderParticles(data, x, y, width, height) {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const maxRadius = Math.min(width, height) / 2 - 10;
+    
+    // 计算每个圆点对应的数据索引
+    const step = Math.max(1, Math.floor(data.length / this.particleCount));
+    const colorStep = this.particleColors.length / this.particleCount;
+    
+    // 存储上一帧的位置（用于拖尾效果）
+    if (!this.lastParticlePositions) {
+      this.lastParticlePositions = [];
+    }
+    
+    for (let i = 0; i < this.particleCount; i++) {
+      const dataIndex = Math.min(i * step, data.length - 1);
+      const amplitude = Math.abs(data[dataIndex]) * this.sensitivity;
+      
+      // 计算圆点大小（根据振幅）
+      const sizeRange = this.particleMaxSize - this.particleMinSize;
+      const particleSize = this.particleMinSize + amplitude * sizeRange;
+      
+      // 计算圆点位置（圆形分布）
+      const angle = (i / this.particleCount) * Math.PI * 2;
+      const baseRadius = maxRadius * 0.6; // 基础半径
+      const radiusOffset = amplitude * maxRadius * 0.4; // 根据振幅偏移
+      const radius = baseRadius + radiusOffset;
+      
+      const px = centerX + Math.cos(angle) * radius;
+      const py = centerY + Math.sin(angle) * radius;
+      
+      // 选择颜色（根据索引从渐变色数组中选取）
+      const colorIndex = Math.floor(i * colorStep) % this.particleColors.length;
+      const color = this.particleColors[colorIndex];
+      
+      // 绘制拖尾效果
+      if (this.particleTrail && this.lastParticlePositions[i]) {
+        const lastPos = this.lastParticlePositions[i];
+        const trailPath = new paper.Path();
+        trailPath.strokeColor = color;
+        trailPath.strokeWidth = particleSize * 0.3;
+        trailPath.strokeColor.alpha = 0.3;
+        
+        // 绘制从上一帧到当前帧的线条
+        trailPath.moveTo(new paper.Point(lastPos.x, lastPos.y));
+        trailPath.lineTo(new paper.Point(px, py));
+      }
+      
+      // 绘制圆点
+      const circle = new paper.Path.Circle({
+        center: new paper.Point(px, py),
+        radius: particleSize / 2,
+      });
+      
+      // 使用渐变色填充
+      circle.fillColor = color;
+      
+      // 添加发光效果（外圈）
+      if (amplitude > 0.3) {
+        const glowCircle = new paper.Path.Circle({
+          center: new paper.Point(px, py),
+          radius: particleSize / 2 + 2,
+        });
+        glowCircle.fillColor = color;
+        glowCircle.fillColor.alpha = 0.2;
+        glowCircle.sendToBack();
+      }
+      
+      // 保存当前位置用于下一帧
+      this.lastParticlePositions[i] = { x: px, y: py };
+    }
+    
+    // 如果启用镜像，在中心绘制对称的圆点
+    if (this.mirror) {
+      for (let i = 0; i < this.particleCount; i++) {
+        const dataIndex = Math.min(i * step, data.length - 1);
+        const amplitude = Math.abs(data[dataIndex]) * this.sensitivity;
+        
+        const sizeRange = this.particleMaxSize - this.particleMinSize;
+        const particleSize = this.particleMinSize + amplitude * sizeRange;
+        
+        const angle = (i / this.particleCount) * Math.PI * 2;
+        const baseRadius = maxRadius * 0.3; // 内圈基础半径
+        const radiusOffset = amplitude * maxRadius * 0.2;
+        const radius = baseRadius + radiusOffset;
+        
+        const px = centerX + Math.cos(angle) * radius;
+        const py = centerY + Math.sin(angle) * radius;
+        
+        const colorIndex = Math.floor(i * colorStep) % this.particleColors.length;
+        const color = this.particleColors[colorIndex];
+        
+        const circle = new paper.Path.Circle({
+          center: new paper.Point(px, py),
+          radius: particleSize / 3, // 内圈圆点稍小
+        });
+        circle.fillColor = color;
+        circle.fillColor.alpha = 0.6;
       }
     }
   }
