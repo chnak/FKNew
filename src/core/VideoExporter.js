@@ -97,21 +97,186 @@ export class VideoExporter {
       // 打印转场统计信息（可选）
       TransitionElement.printTransitionStats();
 
-      // 使用 FFmpeg 将帧序列转换为视频
-      await this.ffmpeg.imagesToVideo(framePattern, outputPath, {
+      // 收集所有音频元素（在渲染帧的同时可以提前准备）
+      // 注意：需要在渲染前收集，因为 CompositionElement 可能在渲染时才初始化
+      let audioConfigs = [];
+      
+      // 递归函数：从 CompositionElement 中收集音频
+      const collectFromComposition = (compElement, parentStartTime = 0) => {
+        if (!compElement) return;
+        
+        const currentStartTime = parentStartTime + (compElement.startTime || 0);
+        
+        // 从 elementsConfig 中收集（配置对象）
+        // 注意：Track.build() 返回的配置中使用的是 'elements' 字段，而不是 'elementsConfig'
+        const configArray = compElement.elementsConfig || compElement.elements;
+        if (configArray && Array.isArray(configArray)) {
+          for (const childConfig of configArray) {
+            if (!childConfig) continue;
+            
+            if (childConfig.type === 'audio') {
+              audioConfigs.push({
+                path: childConfig.audioPath || childConfig.src,
+                startTime: currentStartTime + (childConfig.startTime || 0),
+                duration: childConfig.duration,
+                audioStartTime: childConfig.cutFrom !== undefined ? childConfig.cutFrom : (childConfig.audioStartTime || 0),
+                audioEndTime: childConfig.cutTo !== undefined ? childConfig.cutTo : childConfig.audioEndTime,
+                volume: childConfig.volume !== undefined ? childConfig.volume : 1.0,
+                fadeIn: childConfig.fadeIn || 0,
+                fadeOut: childConfig.fadeOut || 0,
+                loop: childConfig.loop || false,
+              });
+            } else if (childConfig.type === 'composition') {
+              // 递归处理嵌套的 CompositionElement（配置对象）
+              collectFromComposition(childConfig, currentStartTime);
+            }
+          }
+        }
+        
+        // 从 elements 中收集（如果存在，这是已初始化的元素实例）
+        // 注意：只有当 elements 和 elementsConfig 不是同一个数组时才处理，避免重复收集
+        if (compElement.elements && Array.isArray(compElement.elements)) {
+          const isSameAsConfig = compElement.elements === compElement.elementsConfig;
+          if (!isSameAsConfig) {
+            for (const childElement of compElement.elements) {
+              if (!childElement) continue;
+              
+              if (childElement.type === 'audio' && childElement.audioPath) {
+                audioConfigs.push(childElement.getAudioConfig ? childElement.getAudioConfig() : {
+                  path: childElement.audioPath,
+                  startTime: currentStartTime + (childElement.startTime || 0),
+                  duration: childElement.duration,
+                  audioStartTime: childElement.audioStartTime || 0,
+                  audioEndTime: childElement.audioEndTime,
+                  volume: childElement.volume || 1.0,
+                  fadeIn: childElement.fadeIn || 0,
+                  fadeOut: childElement.fadeOut || 0,
+                  loop: childElement.loop || false,
+                });
+              }
+            }
+          }
+        }
+      };
+      
+      // 先尝试使用 collectAllAudioElements 方法
+      audioConfigs = composition.collectAllAudioElements();
+      
+      // 如果收集到的音频元素为空，从 CompositionElement 的配置中直接收集
+      if (audioConfigs.length === 0) {
+        // 遍历所有图层，查找 CompositionElement
+        for (const layer of composition.timeline.getLayers()) {
+          if (layer.elements) {
+            for (const element of layer.elements) {
+              if (element && element.type === 'composition') {
+                collectFromComposition(element, 0);
+              }
+            }
+          }
+        }
+      }
+      
+      // 去重：根据路径和开始时间去重
+      const uniqueAudioConfigs = [];
+      const seen = new Set();
+      for (const audio of audioConfigs) {
+        const key = `${audio.path}_${audio.startTime}_${audio.duration}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueAudioConfigs.push(audio);
+        }
+      }
+      audioConfigs = uniqueAudioConfigs;
+      
+      if (audioConfigs.length > 0) {
+        console.log(`收集到 ${audioConfigs.length} 个音频元素`);
+      }
+      
+      // 并行处理：同时进行视频编码和音频处理
+      // 这样可以充分利用 CPU 和 I/O 资源，提升整体速度
+      const videoEncodingPromise = this.ffmpeg.imagesToVideo(framePattern, outputPath, {
         fps: fps,
         width: composition.width,
         height: composition.height,
       });
 
-      // 如果有音频，添加到视频
+      let audioProcessingPromise = Promise.resolve(null);
+      let hasAudio = false;
+      
+      // 如果有音频路径（旧方式）或音频元素，准备音频处理
       if (audioPath && await fs.pathExists(audioPath)) {
+        // 旧方式：单个音频文件（不需要处理，直接使用）
+        hasAudio = true;
+        audioProcessingPromise = Promise.resolve(audioPath);
+      } else if (audioConfigs.length > 0) {
+        // 新方式：多个音频元素，需要合并
+        hasAudio = true;
+        console.log('开始处理音频（与视频编码并行）...');
+        audioProcessingPromise = this.ffmpeg.mergeAudios(audioConfigs, {
+          outputDir: outputDir,
+          duration: endTime - startTime,
+        }).then(async mergedAudioPath => {
+          if (mergedAudioPath && await fs.pathExists(mergedAudioPath)) {
+            console.log('音频处理完成');
+            return mergedAudioPath;
+          }
+          return null;
+        }).catch(async error => {
+          console.warn('音频处理失败:', error.message);
+          // 如果合并失败，尝试使用第一个音频
+          const firstAudio = audioConfigs[0];
+          if (firstAudio && await fs.pathExists(firstAudio.path)) {
+            return firstAudio.path;
+          }
+          return null;
+        });
+      }
+
+      // 等待视频编码和音频处理都完成
+      const [_, processedAudioPath] = await Promise.all([
+        videoEncodingPromise,
+        audioProcessingPromise,
+      ]);
+
+      // 如果有音频，添加到视频
+      if (hasAudio && processedAudioPath && await fs.pathExists(processedAudioPath)) {
+        console.log('将音频添加到视频...');
         const tempVideoPath = outputPath.replace(/\.(mp4|webm)$/, '_temp.$1');
         await fs.move(outputPath, tempVideoPath);
-        await this.ffmpeg.addAudioToVideo(tempVideoPath, audioPath, outputPath, {
-          audioStartTime: startTime,
-        });
+        
+        if (audioPath && await fs.pathExists(audioPath)) {
+          // 旧方式：单个音频文件
+          await this.ffmpeg.addAudioToVideo(tempVideoPath, audioPath, outputPath, {
+            audioStartTime: startTime,
+          });
+        } else {
+          // 新方式：合并后的音频
+          await this.ffmpeg.addAudioToVideo(tempVideoPath, processedAudioPath, outputPath, {
+            audioStartTime: 0,
+          });
+          
+          // 清理临时音频文件
+          const mergedAudioDir = path.dirname(processedAudioPath);
+          if (mergedAudioDir.includes('temp_audio_')) {
+            await fs.remove(mergedAudioDir).catch(() => {});
+          } else {
+            await fs.remove(processedAudioPath).catch(() => {});
+          }
+        }
+        
         await fs.remove(tempVideoPath);
+      } else if (hasAudio && audioConfigs.length > 0) {
+        // 如果音频处理失败，尝试使用第一个音频
+        const firstAudio = audioConfigs[0];
+        if (firstAudio && await fs.pathExists(firstAudio.path)) {
+          console.log('使用第一个音频文件...');
+          const tempVideoPath = outputPath.replace(/\.(mp4|webm)$/, '_temp.$1');
+          await fs.move(outputPath, tempVideoPath);
+          await this.ffmpeg.addAudioToVideo(tempVideoPath, firstAudio.path, outputPath, {
+            audioStartTime: firstAudio.startTime || 0,
+          });
+          await fs.remove(tempVideoPath);
+        }
       }
 
       // 清理临时文件

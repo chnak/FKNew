@@ -5,6 +5,7 @@ import { TextElement } from '../elements/TextElement.js';
 import { ImageElement } from '../elements/ImageElement.js';
 import { RectElement } from '../elements/RectElement.js';
 import { CircleElement } from '../elements/CircleElement.js';
+import { AudioElement } from '../elements/AudioElement.js';
 
 /**
  * 场景类 - 不再继承 VideoMaker，而是构建 CompositionElement 配置
@@ -103,6 +104,24 @@ export class Scene {
     this.elements.push({
       type: 'circle',
       element: new CircleElement(config),
+    });
+    return this;
+  }
+
+  /**
+   * 添加音频元素
+   * @param {Object} config - 音频配置 { src, startTime, duration, volume, fadeIn, fadeOut, loop }
+   * @returns {Scene} 返回自身以支持链式调用
+   */
+  addAudio(config = {}) {
+    const audioElement = new AudioElement(config);
+    // 异步加载音频信息
+    audioElement.load().catch(err => {
+      console.warn('音频加载失败:', config.src, err);
+    });
+    this.elements.push({
+      type: 'audio',
+      element: audioElement,
     });
     return this;
   }
@@ -227,6 +246,16 @@ export class Scene {
       config.fillColor = element.fillColor !== undefined ? element.fillColor : elementConfig.fillColor;
       config.strokeColor = element.strokeColor !== undefined ? element.strokeColor : elementConfig.strokeColor;
       config.strokeWidth = element.strokeWidth !== undefined ? element.strokeWidth : elementConfig.strokeWidth;
+    } else if (element.type === 'audio') {
+      config.src = element.src !== undefined ? element.src : elementConfig.src;
+      config.audioPath = element.audioPath !== undefined ? element.audioPath : elementConfig.audioPath;
+      // 支持 cutFrom 和 cutTo（新方式）以及 audioStartTime 和 audioEndTime（旧方式）
+      config.cutFrom = element.cutFrom !== undefined ? element.cutFrom : (element.audioStartTime !== undefined ? element.audioStartTime : elementConfig.cutFrom);
+      config.cutTo = element.cutTo !== undefined ? element.cutTo : (element.audioEndTime !== undefined ? element.audioEndTime : elementConfig.cutTo);
+      config.volume = element.volume !== undefined ? element.volume : elementConfig.volume;
+      config.fadeIn = element.fadeIn !== undefined ? element.fadeIn : elementConfig.fadeIn;
+      config.fadeOut = element.fadeOut !== undefined ? element.fadeOut : elementConfig.fadeOut;
+      config.loop = element.loop !== undefined ? element.loop : elementConfig.loop;
     }
 
     return config;

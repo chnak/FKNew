@@ -25,6 +25,7 @@ export const ElementType = {
   SPRITE: 'sprite',
   COMPOSITION: 'composition',
   TRANSITION: 'transition',
+  AUDIO: 'audio',
 };
 
 /**

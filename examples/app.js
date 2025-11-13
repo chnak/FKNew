@@ -37,9 +37,9 @@ const scene = mainTrack.createScene({ duration: 5 })
     duration: 5,
     startTime: 0,
     fontFamily: "MicrosoftYaHei", // 使用注册的字体名称
-    split: "letter",
-    splitDelay: 0.1,
-    splitDuration: 0.3,
+    // split: "letter",
+    // splitDelay: 0.1,
+    // splitDuration: 0.3,
     stroke: true,
     strokeColor: "#000000",
     strokeWidth: 2,

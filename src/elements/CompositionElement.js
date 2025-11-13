@@ -160,6 +160,15 @@ export class CompositionElement extends BaseElement {
           canvasHeight: this.compositionHeight,
           fps: this.fps || 30,
         });
+      case 'audio':
+        // 音频元素不需要渲染，但需要收集配置
+        const { AudioElement } = await import('./AudioElement.js');
+        const audioElement = new AudioElement(elementConfig);
+        // 异步加载音频信息
+        audioElement.load().catch(err => {
+          console.warn('音频加载失败:', elementConfig.src || elementConfig.audioPath, err);
+        });
+        return audioElement;
       default:
         console.warn(`未知的元素类型: ${elementType}`);
         return null;

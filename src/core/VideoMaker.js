@@ -52,6 +52,9 @@ export class VideoMaker {
     this.layers = [];
     this.backgroundLayer = null;
 
+    // 音频管理
+    this.audioElements = [];
+
     // 初始化背景图层
     this.initBackgroundLayer();
   }
@@ -180,6 +183,101 @@ export class VideoMaker {
     const layer = new OverlayLayer(config);
     this.addLayer(layer);
     return layer;
+  }
+
+  /**
+   * 添加音频元素
+   * @param {AudioElement} audioElement - 音频元素
+   */
+  addAudio(audioElement) {
+    if (audioElement && audioElement.type === 'audio') {
+      this.audioElements.push(audioElement);
+    }
+  }
+
+  /**
+   * 获取所有音频元素
+   * @returns {Array<AudioElement>}
+   */
+  getAudioElements() {
+    return this.audioElements;
+  }
+
+  /**
+   * 收集所有音频元素（包括嵌套合成中的音频）
+   * @returns {Array<Object>} 音频配置数组
+   */
+  collectAllAudioElements() {
+    const audioConfigs = [];
+    
+    // 收集当前合成的音频元素
+    for (const audioElement of this.audioElements) {
+      if (audioElement && audioElement.type === 'audio') {
+        // 如果音频已加载，使用加载后的配置；否则使用当前配置
+        if (audioElement.loaded && audioElement.audioPath) {
+          audioConfigs.push(audioElement.getAudioConfig());
+        } else if (audioElement.audioPath) {
+          // 即使未加载，也尝试收集配置（可能在导出时加载）
+          audioConfigs.push(audioElement.getAudioConfig());
+        }
+      }
+    }
+    
+    // 收集图层中的音频元素（如果有）
+    for (const layer of this.layers) {
+      if (layer.elements) {
+        for (const element of layer.elements) {
+          if (element && element.type === 'audio') {
+            if (element.loaded && element.audioPath) {
+              audioConfigs.push(element.getAudioConfig());
+            } else if (element.audioPath) {
+              audioConfigs.push(element.getAudioConfig());
+            }
+          }
+          
+          // 如果元素是 CompositionElement，递归收集其内部的音频元素
+          if (element && element.type === 'composition') {
+            // 方法1：从 CompositionElement 的配置中收集音频元素（如果还未初始化）
+            if (element.elementsConfig) {
+              for (const childConfig of element.elementsConfig) {
+                if (childConfig && childConfig.type === 'audio') {
+                  // 创建音频配置对象
+                  audioConfigs.push({
+                    path: childConfig.audioPath || childConfig.src,
+                    startTime: (element.startTime || 0) + (childConfig.startTime || 0),
+                    duration: childConfig.duration,
+                    audioStartTime: childConfig.cutFrom !== undefined ? childConfig.cutFrom : (childConfig.audioStartTime || 0),
+                    audioEndTime: childConfig.cutTo !== undefined ? childConfig.cutTo : childConfig.audioEndTime,
+                    volume: childConfig.volume !== undefined ? childConfig.volume : 1.0,
+                    fadeIn: childConfig.fadeIn || 0,
+                    fadeOut: childConfig.fadeOut || 0,
+                    loop: childConfig.loop || false,
+                  });
+                }
+              }
+            }
+            
+            // 方法2：从 CompositionElement 的 tempComposition 中收集音频元素（如果已初始化）
+            if (element.tempComposition && typeof element.tempComposition.collectAllAudioElements === 'function') {
+              const nestedAudios = element.tempComposition.collectAllAudioElements();
+              // 调整音频的开始时间（加上 CompositionElement 的开始时间）
+              for (const audio of nestedAudios) {
+                audio.startTime = (element.startTime || 0) + (audio.startTime || 0);
+                audioConfigs.push(audio);
+              }
+            }
+          }
+        }
+      }
+      
+      // 如果图层是 CompositionLayer，递归收集嵌套合成中的音频
+      if (layer.composition && typeof layer.composition.collectAllAudioElements === 'function') {
+        const nestedAudios = layer.composition.collectAllAudioElements();
+        audioConfigs.push(...nestedAudios);
+      }
+    }
+    
+    return audioConfigs;
   }
 
   /**
