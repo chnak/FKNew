@@ -468,7 +468,6 @@ export class TextElement extends BaseElement {
     pointText.fontWeight = fontWeight;
     pointText.fontStyle = fontStyle;
     pointText.fillColor = state.color || '#000000';
-    pointText.opacity = state.opacity !== undefined ? state.opacity : 1;
 
     // 设置文本对齐
     const textAlign = state.textAlign || 'center';
@@ -490,21 +489,11 @@ export class TextElement extends BaseElement {
       pointText.baseline = 'top';
     }
 
-    // 应用变换
-    if (state.rotation) {
-      pointText.rotate(state.rotation);
-    }
-    // 应用缩放（如果 scaleX 或 scaleY 存在且不等于 1，或者它们被动画修改过）
-    // 注意：scaleX 和 scaleY 可能为 0（动画初始状态），所以需要检查 undefined
-    const scaleX = state.scaleX !== undefined ? state.scaleX : 1;
-    const scaleY = state.scaleY !== undefined ? state.scaleY : 1;
-    // 只有当 scaleX 或 scaleY 不等于 1 时才应用缩放（包括 0 的情况）
-    if (scaleX !== 1 || scaleY !== 1) {
-      // 如果 scaleX 或 scaleY 为 0，需要先设置一个很小的值，否则 Paper.js 可能无法正确渲染
-      const finalScaleX = scaleX === 0 ? 0.001 : scaleX;
-      const finalScaleY = scaleY === 0 ? 0.001 : scaleY;
-      pointText.scale(finalScaleX, finalScaleY);
-    }
+    // 使用统一的变换方法应用动画
+    // 注意：TextElement 的位置已经在创建时通过 pointText.point 设置了，所以不需要再次应用位置
+    this.applyTransform(pointText, state, {
+      applyPosition: false, // 位置已经通过 pointText.point 设置了
+    });
 
     // 如果启用了描边
     if (state.stroke && state.strokeWidth > 0) {

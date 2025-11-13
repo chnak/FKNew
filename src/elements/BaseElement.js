@@ -8,6 +8,7 @@ import { TransformAnimation } from '../animations/TransformAnimation.js';
 import { KeyframeAnimation } from '../animations/KeyframeAnimation.js';
 import { AnimationType } from '../types/enums.js';
 import { getPresetAnimation } from '../animations/preset-animations.js';
+import paper from 'paper-jsdom-canvas';
 
 /**
  * 根据动画配置创建动画实例
@@ -400,6 +401,90 @@ export class BaseElement {
   isInitialized() {
     // 默认返回 true，子类可以覆盖
     return true;
+  }
+
+  /**
+   * 将状态中的变换应用到 Paper.js 对象
+   * 这是一个统一的动画应用方法，所有元素都应该使用它来应用变换
+   * @param {Object} item - Paper.js 对象（Path, Raster, Group, PointText 等）
+   * @param {Object} state - 元素状态（从 getStateAtTime 获取）
+   * @param {Object} options - 选项
+   * @param {paper.Point} options.pivot - 变换的中心点（用于 rotation 和 scale），如果不提供则使用 item.position
+   * @param {boolean} options.applyPosition - 是否应用位置（x, y），默认 true
+   * @param {boolean} options.applyOpacity - 是否应用透明度，默认 true
+   * @param {boolean} options.applyRotation - 是否应用旋转，默认 true
+   * @param {boolean} options.applyScale - 是否应用缩放，默认 true
+   */
+  applyTransform(item, state, options = {}) {
+    if (!item) return;
+
+    const {
+      pivot = null,
+      applyPosition = true,
+      applyOpacity = true,
+      applyRotation = true,
+      applyScale = true,
+    } = options;
+
+    // 快速路径：检查是否有需要应用的变换
+    const needsPosition = applyPosition && state.x !== undefined && typeof state.x === 'number' && state.y !== undefined && typeof state.y === 'number';
+    const needsOpacity = applyOpacity && state.opacity !== undefined;
+    const needsRotation = applyRotation && state.rotation !== undefined && state.rotation !== 0;
+    const needsScale = applyScale && (state.scaleX !== undefined || state.scaleY !== undefined) && 
+                       ((state.scaleX !== undefined && state.scaleX !== 1) || (state.scaleY !== undefined && state.scaleY !== 1));
+    
+    if (!needsPosition && !needsOpacity && !needsRotation && !needsScale) {
+      return; // 没有需要应用的变换，直接返回
+    }
+
+    // 应用位置（x, y）
+    if (needsPosition) {
+      // 如果 item 有 position 属性，直接设置
+      if (item.position !== undefined) {
+        item.position = new paper.Point(state.x, state.y);
+      } else if (item.center !== undefined) {
+        // 对于 Path 等对象，使用 center
+        item.center = new paper.Point(state.x, state.y);
+      }
+    }
+
+    // 应用透明度
+    if (needsOpacity) {
+      item.opacity = state.opacity;
+    }
+
+    // 确定变换中心点（只在需要旋转或缩放时计算）
+    if (needsRotation || needsScale) {
+      let transformPivot;
+      if (pivot) {
+        transformPivot = pivot;
+      } else if (item.position) {
+        transformPivot = item.position;
+      } else if (item.center) {
+        transformPivot = item.center;
+      } else {
+        transformPivot = new paper.Point(0, 0);
+      }
+
+      // 应用旋转
+      if (needsRotation) {
+        item.rotate(state.rotation, transformPivot);
+      }
+
+      // 应用缩放
+      if (needsScale) {
+        const scaleX = state.scaleX !== undefined ? state.scaleX : 1;
+        const scaleY = state.scaleY !== undefined ? state.scaleY : 1;
+        
+        // 只有当 scaleX 或 scaleY 不等于 1 时才应用缩放（包括 0 的情况）
+        if (scaleX !== 1 || scaleY !== 1) {
+          // 如果 scaleX 或 scaleY 为 0，需要先设置一个很小的值，否则 Paper.js 可能无法正确渲染
+          const finalScaleX = scaleX === 0 ? 0.001 : scaleX;
+          const finalScaleY = scaleY === 0 ? 0.001 : scaleY;
+          item.scale(finalScaleX, finalScaleY, transformPivot);
+        }
+      }
+    }
   }
 
   /**

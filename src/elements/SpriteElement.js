@@ -83,15 +83,11 @@ export class SpriteElement extends BaseElement {
     }
 
     item.fillColor = this.spriteConfig.bgcolor || '#ffffff';
-    item.opacity = state.opacity !== undefined ? state.opacity : 1;
 
-    // 应用变换
-    if (state.rotation) {
-      item.rotate(state.rotation, new paper.Point(x, y));
-    }
-    if (state.scaleX !== 1 || state.scaleY !== 1) {
-      item.scale(state.scaleX || 1, state.scaleY || 1, new paper.Point(x, y));
-    }
+    // 使用统一的变换方法应用动画
+    this.applyTransform(item, state, {
+      pivot: new paper.Point(x, y), // 使用中心作为变换中心
+    });
 
     layer.addChild(item);
     return item;

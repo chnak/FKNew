@@ -123,7 +123,6 @@ export class RectElement extends BaseElement {
     // 处理填充颜色（支持 fillColor 和 bgcolor）
     const fillColor = state.fillColor || state.bgcolor || '#ffffff';
     rect.fillColor = fillColor;
-    rect.opacity = state.opacity !== undefined ? state.opacity : 1;
 
     // 边框（支持 strokeColor 和 borderColor）
     const strokeColor = state.strokeColor || state.borderColor;
@@ -133,12 +132,16 @@ export class RectElement extends BaseElement {
       rect.strokeWidth = strokeWidth;
     }
 
-    // 应用变换
-    if (state.rotation) {
-      rect.rotate(state.rotation, new paper.Point(x, y));
-    }
-    if (state.scaleX !== 1 || state.scaleY !== 1) {
-      rect.scale(state.scaleX || 1, state.scaleY || 1, new paper.Point(x, y));
+    // 使用统一的变换方法应用动画
+    // 优化：对于没有动画的静态矩形，直接设置 opacity，避免不必要的变换计算
+    if (this.animations.length === 0 && state.opacity === undefined) {
+      // 没有动画，直接设置默认透明度
+      rect.opacity = 1;
+    } else {
+      // 有动画或需要设置透明度，使用统一的变换方法
+      this.applyTransform(rect, state, {
+        pivot: new paper.Point(x, y), // 使用矩形中心作为变换中心
+      });
     }
 
     // 添加到 layer

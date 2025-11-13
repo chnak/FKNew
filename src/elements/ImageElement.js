@@ -87,7 +87,6 @@ export class ImageElement extends BaseElement {
     const raster = new paper.Raster(this.imageData);
     raster.position = new paper.Point(x, y);
     raster.size = new paper.Size(width, height);
-    raster.opacity = state.opacity !== undefined ? state.opacity : 1;
 
     // 处理图片适配方式
     if (state.fit === 'cover' || state.fit === 'contain') {
@@ -95,13 +94,10 @@ export class ImageElement extends BaseElement {
       // 这里可以添加额外逻辑
     }
 
-    // 应用变换
-    if (state.rotation) {
-      raster.rotate(state.rotation);
-    }
-    if (state.scaleX !== 1 || state.scaleY !== 1) {
-      raster.scale(state.scaleX || 1, state.scaleY || 1);
-    }
+    // 使用统一的变换方法应用动画
+    this.applyTransform(raster, state, {
+      applyPosition: false, // 位置已经通过 raster.position 设置了
+    });
 
     // 添加到 layer
     layer.addChild(raster);

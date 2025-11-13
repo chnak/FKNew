@@ -199,13 +199,14 @@ export class Scene {
     const elementInstances = [];
     
     // 添加背景（作为矩形元素）
+    // 注意：Paper.js 的原点在画布左上角 (0, 0)，所以背景矩形应该从 (0, 0) 开始
     if (this.backgroundLayer) {
       const backgroundElement = new RectElement({
-        x: 0,
-        y: 0,
+        x: this.width / 2, // 画布中心 X（因为 anchor 是 [0.5, 0.5]，所以需要设置为中心）
+        y: this.height / 2, // 画布中心 Y
         width: this.width,
         height: this.height,
-        anchor: [0, 0], // 从左上角开始，确保填充全屏
+        anchor: [0.5, 0.5], // 以中心为锚点，这样矩形会从 (0, 0) 到 (width, height)
         bgcolor: this.backgroundLayer.config.backgroundColor,
         startTime: 0, // 相对于场景的开始时间
         duration: this.duration,

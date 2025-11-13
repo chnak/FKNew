@@ -344,23 +344,22 @@ export class CompositionElement extends BaseElement {
       
       // 设置 Group 的位置（这是 Composition 在父 canvas 中的位置）
       group.position = new paper.Point(x, y);
-      group.opacity = state.opacity !== undefined ? state.opacity : 1;
-      
+
       // 如果指定了 width 和 height，需要缩放 Raster
       if (width !== tempCanvas.width || height !== tempCanvas.height) {
         const scaleX = width / tempCanvas.width;
         const scaleY = height / tempCanvas.height;
         raster.scale(scaleX, scaleY);
       }
-      
-      
-      // 应用变换（以 group 的位置 (x, y) 为中心）
-      if (state.rotation) {
-        group.rotate(state.rotation);
-      }
-      if (state.scaleX !== 1 || state.scaleY !== 1) {
-        group.scale(state.scaleX || 1, state.scaleY || 1);
-      }
+
+      // 使用统一的变换方法应用动画
+      // 注意：CompositionElement 的位置已经通过 group.position 设置了，所以不需要再次应用位置
+      // 但是需要将 group 的缩放和 state 的缩放合并
+      // 由于已经应用了尺寸缩放，这里只应用动画的缩放
+      this.applyTransform(group, state, {
+        applyPosition: false, // 位置已经通过 group.position 设置了
+        pivot: new paper.Point(x, y), // 使用 group 的位置作为变换中心
+      });
       
       // 添加到 layer
       layer.addChild(group);

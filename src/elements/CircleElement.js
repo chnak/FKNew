@@ -82,7 +82,6 @@ export class CircleElement extends BaseElement {
     });
 
     circle.fillColor = state.bgcolor || '#ffffff';
-    circle.opacity = state.opacity !== undefined ? state.opacity : 1;
 
     // 边框
     if (state.borderWidth > 0) {
@@ -90,13 +89,10 @@ export class CircleElement extends BaseElement {
       circle.strokeWidth = state.borderWidth;
     }
 
-    // 应用变换
-    if (state.rotation) {
-      circle.rotate(state.rotation, new paper.Point(x, y));
-    }
-    if (state.scaleX !== 1 || state.scaleY !== 1) {
-      circle.scale(state.scaleX || 1, state.scaleY || 1, new paper.Point(x, y));
-    }
+    // 使用统一的变换方法应用动画
+    this.applyTransform(circle, state, {
+      pivot: new paper.Point(x, y), // 使用圆心作为变换中心
+    });
 
     // 添加到 layer
     layer.addChild(circle);
