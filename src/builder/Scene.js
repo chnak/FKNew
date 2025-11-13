@@ -1,5 +1,5 @@
 /**
- * 场景类 - 使用 CompositionElement 方式构建
+ * 场景类 - 直接使用 Layer 方式构建
  */
 import { TextElement } from '../elements/TextElement.js';
 import { ImageElement } from '../elements/ImageElement.js';
@@ -10,7 +10,7 @@ import { SubtitleElement } from '../elements/SubtitleElement.js';
 import { LRCSubtitleBuilder } from '../utils/lrcSubtitleBuilder.js';
 
 /**
- * 场景类 - 不再继承 VideoMaker，而是构建 CompositionElement 配置
+ * 场景类 - 直接返回元素实例数组，不使用 CompositionElement
  */
 export class Scene {
   constructor(config = {}) {
@@ -174,50 +174,46 @@ export class Scene {
   }
 
   /**
-   * 构建场景（返回 CompositionElement 配置，包含所有元素）
-   * @returns {Object} CompositionElement 配置对象
+   * 构建场景（返回元素实例数组，不使用 CompositionElement）
+   * @param {number} sceneStartTime - 场景在轨道中的开始时间（绝对时间）
+   * @returns {Array<BaseElement>} 元素实例数组
    */
-  build() {
-    const elementConfigs = [];
+  build(sceneStartTime = 0) {
+    const elementInstances = [];
     
     // 添加背景（作为矩形元素）
     if (this.backgroundLayer) {
-      elementConfigs.push({
-        type: 'rect',
-        x: '50%',
-        y: '50%',
+      const backgroundElement = new RectElement({
+        x: 0,
+        y: 0,
         width: this.width,
         height: this.height,
+        anchor: [0, 0], // 从左上角开始，确保填充全屏
         bgcolor: this.backgroundLayer.config.backgroundColor,
-        anchor: [0.5, 0.5],
-        zIndex: -9999,
-        startTime: 0,
+        startTime: 0, // 相对于场景的开始时间
         duration: this.duration,
+        zIndex: -9999,
       });
+      elementInstances.push(backgroundElement);
     }
 
-    // 添加所有元素配置
+    // 添加所有元素实例
     for (const { element } of this.elements) {
-      // 将元素转换为配置对象
-      const elementConfig = this.elementToConfig(element);
-      if (elementConfig) {
-        elementConfigs.push(elementConfig);
+      // 元素的时间是相对于场景的，需要确保正确设置
+      if (element) {
+        // 如果元素没有设置 startTime，默认为 0（相对于场景开始）
+        if (element.startTime === undefined) {
+          element.startTime = 0;
+        }
+        // 确保元素的 endTime 正确
+        if (element.duration !== undefined && element.endTime === Infinity) {
+          element.endTime = element.startTime + element.duration;
+        }
+        elementInstances.push(element);
       }
     }
 
-    // 返回场景的 CompositionElement 配置
-    return {
-      type: 'composition',
-      x: '50%',
-      y: '50%',
-      width: this.width,
-      height: this.height,
-      anchor: [0.5, 0.5],
-      startTime: 0, // 相对于轨道的开始时间，由 Track 设置
-      duration: this.duration,
-      zIndex: 0,
-      elements: elementConfigs, // 所有元素作为子元素
-    };
+    return elementInstances;
   }
 
   /**

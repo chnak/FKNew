@@ -1,11 +1,11 @@
 /**
- * 轨道类 - 使用 CompositionElement 方式构建
+ * 轨道类 - 直接使用 Layer 方式构建
  */
 import { Scene } from './Scene.js';
 import { Transition } from './Transition.js';
 
 /**
- * 轨道类 - 不再继承 VideoMaker，而是构建 CompositionElement 配置
+ * 轨道类 - 直接创建 Layer 并添加元素，不使用 CompositionElement
  */
 export class Track {
   constructor(config = {}) {
@@ -79,27 +79,56 @@ export class Track {
   }
 
   /**
-   * 构建轨道（返回 CompositionElement 配置，包含所有场景）
-   * @returns {Object} CompositionElement 配置对象
+   * 构建轨道（直接创建 Layer 并添加元素到 VideoMaker）
+   * @param {VideoMaker} videoMaker - VideoMaker 实例
+   * @returns {ElementLayer} 创建的 Layer
    */
-  build() {
+  build(videoMaker) {
     const totalDuration = this.getTotalDuration();
     
-    // 构建所有场景，获取它们的 CompositionElement 配置
-    const sceneElements = [];
+    // 为轨道创建 Layer
+    const layer = videoMaker.createElementLayer({
+      zIndex: this.zIndex,
+      startTime: 0,
+      endTime: totalDuration,
+    });
+    
+    // 构建所有场景，获取它们的元素
     let currentTime = 0;
     
     for (let i = 0; i < this.scenes.length; i++) {
       const scene = this.scenes[i];
       const sceneStartTime = scene.startTime !== undefined ? scene.startTime : currentTime;
       
-      // 构建场景，返回 CompositionElement 配置
-      const sceneElementConfig = scene.build();
-      if (sceneElementConfig) {
-        // 设置场景的时间范围
-        sceneElementConfig.startTime = sceneStartTime;
-        sceneElementConfig.duration = scene.duration;
-        sceneElements.push(sceneElementConfig);
+      // 构建场景，返回元素实例数组
+      const sceneElements = scene.build(sceneStartTime);
+      
+      // 将所有元素添加到 Layer 或 VideoMaker（音频元素特殊处理）
+      for (const element of sceneElements) {
+        // 设置元素的绝对时间（相对于视频开始）
+        const relativeStartTime = element.startTime || 0;
+        const absoluteStartTime = sceneStartTime + relativeStartTime;
+        element.startTime = absoluteStartTime;
+        
+        // 更新元素的 endTime（基于绝对时间）
+        if (element.duration !== undefined) {
+          element.endTime = absoluteStartTime + element.duration;
+        } else if (element.endTime !== Infinity) {
+          // 如果 endTime 不是 Infinity，也需要转换为绝对时间
+          element.endTime = sceneStartTime + (element.endTime - relativeStartTime);
+        }
+        
+        // 音频元素需要添加到 VideoMaker 的 audioElements 数组，而不是 Layer
+        if (element.type === 'audio') {
+          // 更新音频元素的开始时间
+          if (element.audioStartTime === undefined) {
+            element.audioStartTime = 0;
+          }
+          videoMaker.addAudio(element);
+        } else {
+          // 其他元素添加到 Layer
+          layer.addElement(element);
+        }
       }
       
       currentTime = sceneStartTime + scene.duration;
@@ -108,19 +137,7 @@ export class Track {
       // TODO: 转场效果需要重新设计
     }
 
-    // 返回轨道的 CompositionElement 配置
-    return {
-      type: 'composition',
-      x: '50%',
-      y: '50%',
-      width: this.width,
-      height: this.height,
-      anchor: [0.5, 0.5],
-      startTime: 0,
-      duration: totalDuration,
-      zIndex: this.zIndex,
-      elements: sceneElements, // 所有场景作为子元素
-    };
+    return layer;
   }
 
   /**
