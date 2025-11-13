@@ -126,6 +126,18 @@ export class Track {
           }
           videoMaker.addAudio(element);
         } else {
+          // 设置元素的 canvasWidth 和 canvasHeight
+          element.canvasWidth = videoMaker.width;
+          element.canvasHeight = videoMaker.height;
+          
+          // 如果是分割文本，也需要设置子元素的 canvasWidth 和 canvasHeight
+          if (element.type === 'text' && element.segments) {
+            for (const segment of element.segments) {
+              segment.canvasWidth = videoMaker.width;
+              segment.canvasHeight = videoMaker.height;
+            }
+          }
+          
           // 其他元素添加到 Layer
           layer.addElement(element);
         }

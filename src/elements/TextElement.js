@@ -69,14 +69,6 @@ export class TextElement extends BaseElement {
     // 获取分割后的片段
     const segments = this.splitter.getTextSegments(this.split);
     
-    // 调试：检查 segments 的位置
-    if (segments.length > 0) {
-      console.log(`[TextElement] 分割文本 "${this.config.text}"，片段数: ${segments.length}`);
-      for (let i = 0; i < Math.min(3, segments.length); i++) {
-        console.log(`  片段 ${i}: text="${segments[i].text}", x=${segments[i].x}, y=${segments[i].y}, width=${segments[i].width}`);
-      }
-    }
-    
     // 计算文本总宽度和高度（用于对齐）
     const totalWidth = this.splitter.getTotalWidth();
     const totalHeight = this.splitter.getTotalHeight();
@@ -169,21 +161,11 @@ export class TextElement extends BaseElement {
         }) : [],
       };
       
-      // 调试：检查 segmentConfig
-      if (index < 2) {
-        console.log(`[TextElement] 创建子元素 ${index}: text="${segmentConfig.text}", segmentOffsetX=${segmentConfig.segmentOffsetX}, segmentOffsetY=${segmentConfig.segmentOffsetY}`);
-      }
-      
       // 创建子 TextElement
       const segmentElement = new TextElement(segmentConfig);
       segmentElement.parentElement = this; // 标记父元素
       segmentElement.segmentIndex = index; // 标记片段索引
       segmentElement.isSegment = true; // 标记这是分割后的片段
-      
-      // 调试：检查创建后的子元素配置
-      if (index < 2) {
-        console.log(`[TextElement] 子元素 ${index} 创建后: segmentOffsetX=${segmentElement.config.segmentOffsetX}, segmentOffsetY=${segmentElement.config.segmentOffsetY}`);
-      }
       
       // 分割文本初始透明度为 0，动画开始时才设置为 1
       // 检查是否有淡入动画（fadeIn），如果没有则添加一个默认的淡入动画
@@ -309,12 +291,13 @@ export class TextElement extends BaseElement {
 
     // 获取场景尺寸用于单位转换
     // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 paper.view.viewSize
-    const viewSize = paper.view.viewSize;
+    const viewSize = paper.view && paper.view.viewSize ? paper.view.viewSize : { width: 1920, height: 1080 };
     const context = { 
       width: this.canvasWidth || viewSize.width, 
       height: this.canvasHeight || viewSize.height, 
       baseFontSize: 16 
     };
+    
     const state = this.getStateAtTime(time, context);
 
     // 转换字体大小单位
@@ -340,8 +323,8 @@ export class TextElement extends BaseElement {
       const totalHeight = this.config.totalTextHeight || 0;
       
       // 转换父元素位置单位
-      const parentXPixels = typeof parentX === 'string' ? toPixels(parentX, context.width, 'x') : parentX;
-      const parentYPixels = typeof parentY === 'string' ? toPixels(parentY, context.height, 'y') : parentY;
+      const parentXPixels = typeof parentX === 'string' ? toPixels(parentX, context, 'x') : parentX;
+      const parentYPixels = typeof parentY === 'string' ? toPixels(parentY, context, 'y') : parentY;
       
       // 计算文本基准位置（考虑 anchor 和 textAlign）
       let baseX = parentXPixels;
@@ -377,20 +360,15 @@ export class TextElement extends BaseElement {
       const offsetY = this.config.segmentOffsetY !== undefined ? this.config.segmentOffsetY : 0;
       x = baseX + offsetX;
       y = baseY + offsetY;
-      
-      // 调试：检查位置计算
-      if (this.segmentIndex !== undefined && this.segmentIndex < 2) {
-        console.log(`[TextElement] 渲染子元素 ${this.segmentIndex}: baseX=${baseX}, offsetX=${offsetX}, finalX=${x}, baseY=${baseY}, offsetY=${offsetY}, finalY=${y}`);
-      }
     } else {
       // 普通元素，转换位置单位
       x = state.x;
       y = state.y;
       if (typeof x === 'string') {
-        x = toPixels(x, context.width, 'x');
+        x = toPixels(x, context, 'x');
       }
       if (typeof y === 'string') {
-        y = toPixels(y, context.height, 'y');
+        y = toPixels(y, context, 'y');
       }
     }
 
