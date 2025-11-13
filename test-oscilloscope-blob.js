@@ -29,8 +29,8 @@ async function testBlobOscilloscope() {
   
   // ========== 配置参数 ==========
   const AUDIO_START_TIME = 0;
-  const AUDIO_DURATION = 10;
-  const VIDEO_DURATION = 10;
+  const AUDIO_DURATION = 30;
+  const VIDEO_DURATION = 30;
   // ==============================
   
   console.log(`使用音频文件: ${audioFile}`);
@@ -72,12 +72,12 @@ async function testBlobOscilloscope() {
     cutTo: cutTo,
     x: '50%',
     y: '50%',
-    width: 800,
-    height: 800,
+    width: '50%',
+    height: '50%',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     style: 'blob',
-    sensitivity: 3.0,
-    blobBallCount: 6,
+    sensitivity: 5,
+    blobBallCount: 50, // 增加球体数量
     particleColors: [
       '#ff0080', '#ff4080', '#ff8000', '#ffc000',
       '#ffff00', '#80ff00', '#00ff80', '#00ffff',

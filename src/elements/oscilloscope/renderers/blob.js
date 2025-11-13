@@ -9,19 +9,6 @@ export default function renderBlob(element, data, x, y, width, height, time) {
   const centerY = y + height / 2;
   const maxRadius = Math.min(width, height) / 2 - 20;
   
-  // 初始化球体数组（如果还没有）
-  if (!element.blobBalls) {
-    element.blobBalls = [];
-    element.blobInitialized = false;
-  }
-  
-  // 计算平均振幅和频段数据
-  let avgAmplitude = 0;
-  for (let i = 0; i < data.length; i++) {
-    avgAmplitude += Math.abs(data[i]);
-  }
-  avgAmplitude = (avgAmplitude / data.length) * element.sensitivity;
-  
   // 将音频数据分成多个频段
   const numBalls = element.blobBallCount || 6;
   const bands = [];
@@ -38,43 +25,72 @@ export default function renderBlob(element, data, x, y, width, height, time) {
     bands.push(count > 0 ? sum / count : 0);
   }
   
-  // 初始化球体
-  if (!element.blobInitialized) {
+  // 初始化球体状态（如果还没有）
+  if (!element.blobBalls || element.blobBalls.length === 0) {
     element.blobBalls = [];
-    const baseRadius = maxRadius * 0.3;
+    const baseRadius = maxRadius * 0.15; // 减小基础半径
     
     for (let i = 0; i < numBalls; i++) {
-      const angle = (i / numBalls) * Math.PI * 2;
-      const distance = maxRadius * 0.4;
-      const position = new paper.Point(
-        centerX + Math.cos(angle) * distance,
-        centerY + Math.sin(angle) * distance
-      );
+      // 随机位置（在显示区域内）
+      const randomX = x + Math.random() * width;
+      const randomY = y + Math.random() * height;
+      const position = new paper.Point(randomX, randomY);
       
+      // 随机方向
+      const randomAngle = Math.random() * 360;
       const vector = new paper.Point({
-        angle: angle * 180 / Math.PI + 90,
-        length: 0.5
+        angle: randomAngle,
+        length: 0.3 + Math.random() * 0.4 // 随机速度
       });
       
-      const radius = baseRadius + (baseRadius * 0.3);
-      const ball = createBlobBall(radius, position, vector, element, i);
-      element.blobBalls.push(ball);
+      // 随机半径（在基础半径范围内）
+      const radius = baseRadius * (0.8 + Math.random() * 0.4);
+      
+      // 只保存状态，不创建路径（路径每一帧都会重新创建）
+      element.blobBalls.push({
+        radius: radius,
+        targetRadius: radius,
+        point: position,
+        vector: vector,
+        maxVec: 6, // 减小最大速度
+        numSegment: Math.floor(radius / 3 + 2),
+        boundOffset: [],
+        boundOffsetBuff: [],
+        sidePoints: [],
+        colorIndex: i
+      });
+      
+      // 初始化边界偏移和侧面点
+      const ball = element.blobBalls[i];
+      for (let j = 0; j < ball.numSegment; j++) {
+        ball.boundOffset.push(radius);
+        ball.boundOffsetBuff.push(radius);
+        ball.sidePoints.push(new paper.Point({
+          angle: 360 / ball.numSegment * j,
+          length: 1
+        }));
+      }
     }
-    element.blobInitialized = true;
   }
   
   // 更新球体半径和速度（根据音频数据）
   for (let i = 0; i < element.blobBalls.length && i < bands.length; i++) {
     const ball = element.blobBalls[i];
-    const amplitude = bands[i] * element.sensitivity;
+    const amplitude = bands[i];
     
-    // 根据音频振幅调整目标半径
-    const baseRadius = maxRadius * 0.3;
-    const targetRadius = baseRadius + amplitude * baseRadius * 0.8;
+    // 根据音频振幅调整目标半径，变化幅度与 sensitivity 挂钩
+    const baseRadius = maxRadius * 0.15; // 与初始化时保持一致
+    // sensitivity 控制大小变化幅度：sensitivity 越大，变化幅度越大
+    const sizeVariation = baseRadius * 0.5 * element.sensitivity; // 基础变化幅度 * sensitivity
+    const targetRadius = baseRadius + amplitude * sizeVariation;
     
-    // 平滑过渡到目标半径
+    // 平滑过渡到目标半径（增加平滑度）
     ball.targetRadius = targetRadius;
-    ball.radius += (targetRadius - ball.radius) * 0.1;
+    ball.radius += (targetRadius - ball.radius) * 0.05; // 减小变化速度，从 0.1 到 0.05
+    
+    // 保持最小半径，避免球体过小或消失
+    const minRadius = baseRadius * 0.7;
+    ball.radius = Math.max(minRadius, ball.radius); // 确保 radius 本身也被限制
     
     // 更新边界偏移
     for (let j = 0; j < ball.numSegment; j++) {
@@ -82,8 +98,8 @@ export default function renderBlob(element, data, x, y, width, height, time) {
       ball.boundOffsetBuff[j] = ball.radius;
     }
     
-    // 根据音频调整速度
-    const speed = 0.3 + amplitude * 0.5;
+    // 根据音频调整速度（速度也受 sensitivity 影响）
+    const speed = 0.3 + amplitude * 0.5 * element.sensitivity;
     if (ball.vector.length > 0) {
       ball.vector.length = speed;
     }
@@ -96,8 +112,7 @@ export default function renderBlob(element, data, x, y, width, height, time) {
     }
   }
   
-  // 更新所有球体
-  const size = new paper.Size(width, height);
+  // 更新所有球体位置和形状
   const bounds = new paper.Rectangle(x, y, width, height);
   
   for (let i = 0; i < element.blobBalls.length; i++) {
@@ -109,100 +124,126 @@ export default function renderBlob(element, data, x, y, width, height, time) {
     }
     
     ball.point = ball.point.add(ball.vector);
+  }
+  
+  // 创建并绘制所有球体路径（每一帧都重新创建）
+  for (let i = 0; i < element.blobBalls.length; i++) {
+    const ball = element.blobBalls[i];
     updateBlobShape(ball);
+    drawBlobBall(ball, element);
   }
 }
 
 /**
- * 创建 Blob 球体
+ * 绘制 Blob 球体路径
  */
-function createBlobBall(radius, point, vector, element, index) {
-  const numSegment = Math.floor(radius / 3 + 2);
-  const boundOffset = [];
-  const boundOffsetBuff = [];
-  const sidePoints = [];
+function drawBlobBall(ball, element) {
+  // 确保球体有效
+  if (!ball || !ball.point || !ball.radius || ball.radius <= 0) {
+    return; // 如果球体无效，跳过绘制
+  }
   
   // 选择颜色（从粒子颜色数组或使用随机色相）
   let fillColor;
   if (element.particleColors && element.particleColors.length > 0) {
-    const colorIndex = index % element.particleColors.length;
+    const colorIndex = ball.colorIndex % element.particleColors.length;
     fillColor = element.particleColors[colorIndex];
   } else {
     fillColor = {
-      hue: (index * 60) % 360,
+      hue: (ball.colorIndex * 60) % 360,
       saturation: 0.8,
       brightness: 1
     };
   }
   
+  // 创建路径（每一帧都重新创建）
   const path = new paper.Path({
     fillColor: fillColor,
-    blendMode: 'lighter',
+    blendMode: 'normal', // 改为 normal，避免 lighter 模式导致的闪烁
     closed: true
   });
   
-  for (let i = 0; i < numSegment; i++) {
-    boundOffset.push(radius);
-    boundOffsetBuff.push(radius);
-    path.add(new paper.Point(point.x, point.y)); // 初始位置设置为球心
-    sidePoints.push(new paper.Point({
-      angle: 360 / numSegment * i,
-      length: 1
-    }));
+  // 设置透明度，让叠加效果更自然
+  if (typeof fillColor === 'string') {
+    path.fillColor.alpha = 0.7;
+  } else if (fillColor && fillColor.alpha === undefined) {
+    path.fillColor.alpha = 0.7;
   }
   
-  return {
-    radius: radius,
-    targetRadius: radius,
-    point: point,
-    vector: vector,
-    maxVec: 8,
-    numSegment: numSegment,
-    boundOffset: boundOffset,
-    boundOffsetBuff: boundOffsetBuff,
-    sidePoints: sidePoints,
-    path: path
-  };
+  // 添加所有点
+  for (let i = 0; i < ball.numSegment; i++) {
+    const sidePoint = getBlobSidePoint(ball, i);
+    if (sidePoint && sidePoint.x !== undefined && sidePoint.y !== undefined) {
+      path.add(new paper.Point(sidePoint.x, sidePoint.y));
+    }
+  }
+  
+  // 确保路径有足够的点
+  if (path.segments.length >= 3) {
+    // 平滑路径
+    path.smooth();
+  }
 }
 
 /**
- * 检查边界
+ * 检查边界（使用反弹而不是循环，避免突然消失）
  */
 function checkBlobBorders(ball, bounds) {
-  if (ball.point.x < bounds.x - ball.radius) {
-    ball.point.x = bounds.x + bounds.width + ball.radius;
+  // 使用反弹逻辑，而不是循环边界，避免球体突然消失
+  let bounced = false;
+  
+  if (ball.point.x < bounds.x + ball.radius) {
+    ball.point.x = bounds.x + ball.radius;
+    // 反转 X 方向
+    const angle = ball.vector.angle;
+    ball.vector.angle = 180 - angle;
+    bounced = true;
   }
-  if (ball.point.x > bounds.x + bounds.width + ball.radius) {
-    ball.point.x = bounds.x - ball.radius;
+  if (ball.point.x > bounds.x + bounds.width - ball.radius) {
+    ball.point.x = bounds.x + bounds.width - ball.radius;
+    // 反转 X 方向
+    const angle = ball.vector.angle;
+    ball.vector.angle = 180 - angle;
+    bounced = true;
   }
-  if (ball.point.y < bounds.y - ball.radius) {
-    ball.point.y = bounds.y + bounds.height + ball.radius;
+  if (ball.point.y < bounds.y + ball.radius) {
+    ball.point.y = bounds.y + ball.radius;
+    // 反转 Y 方向
+    const angle = ball.vector.angle;
+    ball.vector.angle = -angle;
+    bounced = true;
   }
-  if (ball.point.y > bounds.y + bounds.height + ball.radius) {
-    ball.point.y = bounds.y - ball.radius;
+  if (ball.point.y > bounds.y + bounds.height - ball.radius) {
+    ball.point.y = bounds.y + bounds.height - ball.radius;
+    // 反转 Y 方向
+    const angle = ball.vector.angle;
+    ball.vector.angle = -angle;
+    bounced = true;
   }
 }
 
 /**
- * 更新球体形状
+ * 更新球体形状（更新边界偏移）
  */
 function updateBlobShape(ball) {
-  const segments = ball.path.segments;
-  for (let i = 0; i < ball.numSegment; i++) {
-    segments[i].point = getBlobSidePoint(ball, i);
+  // 确保半径有效
+  if (!ball.radius || ball.radius <= 0) {
+    ball.radius = 10; // 设置一个最小默认值
   }
   
-  ball.path.smooth();
-  
   for (let i = 0; i < ball.numSegment; i++) {
-    if (ball.boundOffset[i] < ball.radius / 4) {
-      ball.boundOffset[i] = ball.radius / 4;
+    // 确保边界偏移不会太小
+    const minOffset = ball.radius * 0.5; // 从 0.25 改为 0.5，确保球体不会消失
+    if (ball.boundOffset[i] < minOffset) {
+      ball.boundOffset[i] = minOffset;
     }
     const next = (i + 1) % ball.numSegment;
     const prev = (i > 0) ? i - 1 : ball.numSegment - 1;
     let offset = ball.boundOffset[i];
     offset += (ball.radius - offset) / 15;
     offset += ((ball.boundOffset[next] + ball.boundOffset[prev]) / 2 - offset) / 3;
+    // 确保偏移不会太小
+    offset = Math.max(minOffset, offset);
     ball.boundOffsetBuff[i] = ball.boundOffset[i] = offset;
   }
 }

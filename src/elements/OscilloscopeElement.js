@@ -68,7 +68,7 @@ export class OscilloscopeElement extends BaseElement {
     this.explosionParticles = config.explosionParticles || 100; // 爆炸粒子数
     
     // Blob 球体碰撞样式配置
-    this.blobBallCount = config.blobBallCount || 6; // Blob 球体数量
+    this.blobBallCount = config.blobBallCount || 12; // Blob 球体数量（默认12个）
     
     // 音频数据
     this.audioData = null; // 解析后的音频波形数据
