@@ -81,7 +81,7 @@ export default function renderBlob(element, data, x, y, width, height, time) {
     // 根据音频振幅调整目标半径，变化幅度与 sensitivity 挂钩
     const baseRadius = maxRadius * 0.15; // 与初始化时保持一致
     // sensitivity 控制大小变化幅度：sensitivity 越大，变化幅度越大
-    const sizeVariation = baseRadius * 0.5 * element.sensitivity; // 基础变化幅度 * sensitivity
+    const sizeVariation = baseRadius * 0.6 * element.sensitivity; // 基础变化幅度 * sensitivity
     const targetRadius = baseRadius + amplitude * sizeVariation;
     
     // 平滑过渡到目标半径（增加平滑度）
