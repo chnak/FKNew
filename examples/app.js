@@ -44,7 +44,8 @@ const scene = mainTrack.createScene({ duration: 5 })
     strokeColor: "#000000",
     strokeWidth: 2,
     animations: [
-      "bounceIn", // 映射到现有的预设动画
+      "bigIn", // 映射到现有的预设动画
+      "bigOut"
     ]
   })
   .addText({

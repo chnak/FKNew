@@ -128,6 +128,23 @@ export const PRESET_ANIMATIONS = {
     delay: -1,
     easing: 'ease-in-back',
   },
+
+  bigIn: {
+    type: 'transform',
+    from: { scaleX: 0, scaleY: 0 },
+    to: { scaleX: 1, scaleY: 1 },
+    duration: 1,
+    delay: 0,
+    easing: 'ease-out-back',
+  },
+  bigOut: {
+    type: 'transform',
+    from: { scaleX: 1, scaleY: 1 },
+    to: { scaleX: 0, scaleY: 0 },
+    duration: 1,
+    delay: -1,
+    easing: 'ease-in-back',
+  },
   
   // 旋转
   rotateIn: {

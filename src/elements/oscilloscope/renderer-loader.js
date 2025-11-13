@@ -37,7 +37,6 @@ export async function loadRenderers() {
         if (styleName === 'particles') {
           renderers.set('dots', renderer);
         }
-        console.log(`[OscilloscopeRenderer] 已加载渲染器: ${styleName}`);
       }
     } catch (error) {
       console.warn(`[OscilloscopeRenderer] 加载渲染器失败 ${file}:`, error.message);

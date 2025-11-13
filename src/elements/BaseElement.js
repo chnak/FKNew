@@ -264,26 +264,26 @@ export class BaseElement {
     // 应用所有动画
     // 注意：动画的 startTime 是相对于元素自己的 startTime 的
     // 如果 delay 为负数，则从元素的结束时间往前计算
-    for (const animation of this.animations) {
-      // 获取动画的 delay（可能是负数）
-      const delay = animation.config.delay !== undefined ? animation.config.delay : 0;
-      
-      // 计算动画的绝对开始时间
-      let animationAbsoluteStartTime;
-      if (delay < 0) {
-        // 负数 delay：从元素结束时间往前计算
-        // 例如：delay = -1，duration = 2，元素结束时间是 10
-        // 动画开始时间 = 10 - 1 - 2 = 7（确保动画在元素结束前完成）
-        // 或者更简单：动画开始时间 = 元素结束时间 + delay - duration
-        // 但通常我们希望动画在元素结束前完成，所以：
-        // 动画开始时间 = 元素结束时间 + delay
-        animationAbsoluteStartTime = this.endTime + delay;
-      } else {
-        // 正数或0 delay：从元素开始时间往后计算
-        animationAbsoluteStartTime = this.startTime + (animation.startTime || delay);
-      }
-      
+    if (this.animations.length === 0) {
+      // 如果没有动画，直接返回状态
+      return state;
+    }
+    
+    // 按开始时间排序动画，确保先应用先开始的动画
+    const sortedAnimations = [...this.animations].map(anim => {
+      const delay = anim.config.delay !== undefined ? anim.config.delay : 0;
+      const startTime = delay < 0 ? this.endTime + delay : this.startTime + delay;
+      return { animation: anim, startTime, delay };
+    }).sort((a, b) => a.startTime - b.startTime);
+    
+    for (let i = 0; i < sortedAnimations.length; i++) {
+      const { animation, startTime: animationAbsoluteStartTime, delay } = sortedAnimations[i];
       const animationAbsoluteEndTime = animationAbsoluteStartTime + animation.config.duration;
+      
+      // 调试信息（仅在开发时启用）
+      // if (this.type === 'text' && animation.type === 'transform' && time < 0.1) {
+      //   console.log(`[Animation] ${animation.type || 'unknown'}, delay: ${delay}, duration: ${animation.config.duration}, element startTime: ${this.startTime}, element endTime: ${this.endTime}, current time: ${time}, animationAbsoluteStartTime: ${animationAbsoluteStartTime}`);
+      // }
       
       // 获取动画的初始状态（from 值）和结束状态（to 值）
       let animationState = {};
@@ -291,26 +291,51 @@ export class BaseElement {
       // 使用一个小的阈值（1ms）来处理浮点数精度问题
       const epsilon = 0.001;
       
-      if (time < animationAbsoluteStartTime + epsilon) {
-        // 动画还未开始或刚开始，应用初始状态（from 值）
-        // 使用 epsilon 来处理浮点数精度问题，确保在动画开始的第一帧也应用初始状态
+      // 判断动画在当前时间是否应该应用
+      // 只有在动画进行中或刚结束时才应用，避免未开始的动画覆盖已开始的动画
+      const isAnimationActive = time >= animationAbsoluteStartTime - epsilon && time <= animationAbsoluteEndTime + epsilon;
+      const isAnimationBeforeStart = time < animationAbsoluteStartTime - epsilon;
+      const isAnimationAfterEnd = time > animationAbsoluteEndTime + epsilon;
+      
+      // 检查这是否是第一个动画（按开始时间排序）
+      const isFirstAnimation = i === 0;
+      
+      if (isAnimationBeforeStart) {
+        // 动画还未开始
+        // 如果是第一个动画，应用初始状态（确保动画从正确的初始状态开始）
+        // 否则不应用任何状态（避免覆盖其他动画）
+        if (isFirstAnimation) {
+          animationState = animation.getInitialState ? animation.getInitialState() : {};
+        } else {
+          animationState = {};
+        }
+      } else if (time <= animationAbsoluteStartTime + epsilon) {
+        // 动画刚开始，应用初始状态（from 值）
         animationState = animation.getInitialState ? animation.getInitialState() : {};
-      } else if (time > animationAbsoluteEndTime - epsilon) {
+      } else if (isAnimationAfterEnd) {
         // 动画已结束，应用结束状态（to 值）
-        // 使用 epsilon 来处理浮点数精度问题，确保在动画结束的最后一帧也应用结束状态
         animationState = animation.getFinalState ? animation.getFinalState() : {};
       } else {
         // 动画进行中，计算当前状态
         const animationRelativeTime = time - animationAbsoluteStartTime;
-        // 使用动画的 startTime + 相对时间来计算状态
-        // 这样 getStateAtTime 会正确计算进度
+        // getStateAtTime 接收的时间会被用来计算进度
+        // Animation.getProgress 使用 time - this.startTime 来计算经过的时间
+        // 所以需要传递 animation.startTime + animationRelativeTime
+        // 这样动画内部计算时：elapsed = (animation.startTime + animationRelativeTime) - animation.startTime = animationRelativeTime
         animationState = animation.getStateAtTime(animation.startTime + animationRelativeTime);
       }
       
       // 合并动画状态到元素状态（只合并非 undefined 的值）
-      for (const key in animationState) {
-        if (animationState.hasOwnProperty(key) && animationState[key] !== undefined) {
-          state[key] = animationState[key];
+      // 注意：如果动画还未开始，不应用状态，避免覆盖其他动画
+      if (isAnimationActive || isAnimationAfterEnd) {
+        for (const key in animationState) {
+          if (animationState.hasOwnProperty(key) && animationState[key] !== undefined) {
+            state[key] = animationState[key];
+            // 调试信息（仅在开发时启用）
+            // if (this.type === 'text' && (key === 'scaleX' || key === 'scaleY') && time < 0.1) {
+            //   console.log(`[Animation] Applied ${key} = ${animationState[key]} at time ${time}, animationState:`, animationState);
+            // }
+          }
         }
       }
     }

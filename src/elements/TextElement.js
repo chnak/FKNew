@@ -122,6 +122,10 @@ export class TextElement extends BaseElement {
         // 注意：动画的 startTime 是相对于子元素的 startTime 的，所以不需要调整
         // 使用 originalAnimations（原始配置数组），而不是动画实例
         animations: this.originalAnimations && Array.isArray(this.originalAnimations) ? this.originalAnimations.map(anim => {
+          // 如果是字符串（预设动画名称），直接返回
+          if (typeof anim === 'string') {
+            return anim;
+          }
           // 如果是动画实例，提取其配置；如果是配置对象，直接使用
           if (anim && typeof anim.getStateAtTime === 'function') {
             // 这是动画实例，需要提取配置
@@ -135,6 +139,8 @@ export class TextElement extends BaseElement {
             if (anim.property) animConfig.property = anim.property;
             if (anim.from !== undefined) animConfig.from = anim.from;
             if (anim.to !== undefined) animConfig.to = anim.to;
+            if (anim.fromOpacity !== undefined) animConfig.fromOpacity = anim.fromOpacity;
+            if (anim.toOpacity !== undefined) animConfig.toOpacity = anim.toOpacity;
             return animConfig;
           } else {
             // 这是配置对象，直接深拷贝（只拷贝基本类型和数组）
@@ -167,6 +173,18 @@ export class TextElement extends BaseElement {
       segmentElement.segmentIndex = index; // 标记片段索引
       segmentElement.isSegment = true; // 标记这是分割后的片段
       
+      // 调试信息：检查动画是否正确创建（已禁用）
+      // if (index === 0 && segmentElement.animations.length > 0) {
+      //   console.log(`[TextElement] Segment ${index} has ${segmentElement.animations.length} animations:`, 
+      //     segmentElement.animations.map(a => ({ 
+      //       type: a.type, 
+      //       delay: a.config.delay, 
+      //       duration: a.config.duration,
+      //       from: a.from,
+      //       to: a.to
+      //     })));
+      // }
+      
       // 分割文本初始透明度为 0，动画开始时才设置为 1
       // 检查是否有淡入动画（fadeIn），如果没有则添加一个默认的淡入动画
       // 检查原始动画配置和已创建的动画实例
@@ -186,6 +204,11 @@ export class TextElement extends BaseElement {
         // 检查原始动画配置
         if (this.originalAnimations && Array.isArray(this.originalAnimations)) {
           const hasFadeInConfig = this.originalAnimations.some(anim => {
+            // 如果是字符串，检查是否是淡入相关的预设动画
+            if (typeof anim === 'string') {
+              const lowerAnim = anim.toLowerCase();
+              return lowerAnim === 'fadein' || lowerAnim === 'fade-in' || lowerAnim.includes('fadein');
+            }
             if (anim && typeof anim === 'object') {
               // 检查配置对象
               const animType = anim.type || anim.animationType;
@@ -209,8 +232,33 @@ export class TextElement extends BaseElement {
         return false;
       })();
       
-      // 如果没有淡入动画，添加一个默认的淡入动画（从 0 到 1）
-      if (!hasFadeInAnimation) {
+      // 检查是否有 transform 类型的动画（如 bigIn, zoomIn 等）
+      const hasTransformAnimation = (() => {
+        if (this.originalAnimations && Array.isArray(this.originalAnimations)) {
+          return this.originalAnimations.some(anim => {
+            if (typeof anim === 'string') {
+              // 检查是否是 transform 相关的预设动画
+              const lowerAnim = anim.toLowerCase();
+              return lowerAnim.includes('in') || lowerAnim.includes('out') || 
+                     lowerAnim.includes('zoom') || lowerAnim.includes('big') ||
+                     lowerAnim.includes('rotate') || lowerAnim.includes('bounce');
+            }
+            if (anim && typeof anim === 'object') {
+              const animType = anim.type || anim.animationType;
+              return animType === 'transform' || animType === 'move' || animType === 'keyframe';
+            }
+            return false;
+          });
+        }
+        return false;
+      })();
+      
+      // 如果没有淡入动画，且用户没有指定任何动画，才添加一个默认的淡入动画（从 0 到 1）
+      // 如果用户指定了 transform 动画但没有淡入动画，确保初始透明度为 1，这样 transform 动画才能正常显示
+      const hasAnyAnimation = this.originalAnimations && Array.isArray(this.originalAnimations) && this.originalAnimations.length > 0;
+      
+      if (!hasFadeInAnimation && !hasAnyAnimation) {
+        // 用户没有指定任何动画，添加默认淡入
         const defaultFadeIn = new FadeAnimation({
           fromOpacity: 0,
           toOpacity: 1,
@@ -219,6 +267,12 @@ export class TextElement extends BaseElement {
           easing: 'easeOut',
         });
         segmentElement.addAnimation(defaultFadeIn);
+      } else if (hasTransformAnimation && !hasFadeInAnimation) {
+        // 用户指定了 transform 动画但没有淡入动画，确保初始透明度为 1
+        // 这样 transform 动画才能正常显示
+        if (segmentElement.config.opacity === undefined || segmentElement.config.opacity === 0) {
+          segmentElement.config.opacity = 1;
+        }
       }
       
       // 不预先应用动画的初始状态，让动画在开始时才应用
@@ -416,8 +470,16 @@ export class TextElement extends BaseElement {
     if (state.rotation) {
       pointText.rotate(state.rotation);
     }
-    if (state.scaleX !== 1 || state.scaleY !== 1) {
-      pointText.scale(state.scaleX || 1, state.scaleY || 1);
+    // 应用缩放（如果 scaleX 或 scaleY 存在且不等于 1，或者它们被动画修改过）
+    // 注意：scaleX 和 scaleY 可能为 0（动画初始状态），所以需要检查 undefined
+    const scaleX = state.scaleX !== undefined ? state.scaleX : 1;
+    const scaleY = state.scaleY !== undefined ? state.scaleY : 1;
+    // 只有当 scaleX 或 scaleY 不等于 1 时才应用缩放（包括 0 的情况）
+    if (scaleX !== 1 || scaleY !== 1) {
+      // 如果 scaleX 或 scaleY 为 0，需要先设置一个很小的值，否则 Paper.js 可能无法正确渲染
+      const finalScaleX = scaleX === 0 ? 0.001 : scaleX;
+      const finalScaleY = scaleY === 0 ? 0.001 : scaleY;
+      pointText.scale(finalScaleX, finalScaleY);
     }
 
     // 如果启用了描边
@@ -459,4 +521,5 @@ export class TextElement extends BaseElement {
     }
   }
 }
+
 

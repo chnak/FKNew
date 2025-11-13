@@ -215,7 +215,7 @@ async function testNewOscilloscopeEffects() {
   const outputPath = path.join(outputDir, 'oscilloscope-new-effects.mp4');
   
   const startTime = Date.now();
-  await videoMaker.export(outputPath);
+  await videoMaker.export(outputPath,{useJpeg:false});
   const endTime = Date.now();
   const duration = ((endTime - startTime) / 1000).toFixed(2);
   
