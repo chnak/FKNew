@@ -39,9 +39,8 @@ export class VideoExporter {
     const outputDir = path.dirname(outputPath);
     await fs.ensureDir(outputDir);
 
-      // 创建临时目录存储帧
-      const tempDir = path.join(outputDir, `temp_frames_${Date.now()}`);
-      await fs.ensureDir(tempDir);
+      // 不再需要临时目录，直接使用管道
+      const usePipe = options.usePipe !== false; // 默认使用管道模式
 
       try {
         // 记录渲染开始时间
@@ -58,25 +57,42 @@ export class VideoExporter {
 
         // 渲染所有帧
         const totalFrames = Math.ceil((endTime - startTime) * fps);
-        const framePattern = path.join(tempDir, 'frame_%04d.png');
+        const backgroundColor = composition.backgroundColor || '#000000';
 
         console.log(`开始渲染 ${totalFrames} 帧...`);
         
-        // 使用串行渲染
-        const backgroundColor = composition.backgroundColor || '#000000';
-        await this.renderFramesSerial(composition, totalFrames, startTime, fps, tempDir, backgroundColor);
+        // 保存 tempDir 引用（用于文件模式）
+        let tempDir = null;
+        
+        if (usePipe) {
+          // 使用管道模式：直接写入 FFmpeg，不保存中间文件
+          console.log('使用管道模式（不保存中间图片）...');
+          await this.renderFramesWithPipe(composition, totalFrames, startTime, fps, outputPath, backgroundColor, {
+            fps: fps,
+            width: composition.width,
+            height: composition.height,
+          });
+        } else {
+          // 使用文件模式：保存图片到临时目录（编码在后面的代码中处理）
+          tempDir = path.join(outputDir, `temp_frames_${Date.now()}`);
+          await fs.ensureDir(tempDir);
+          
+          // 渲染并保存到文件
+          await this.renderFramesSerial(composition, totalFrames, startTime, fps, tempDir, backgroundColor);
+          console.log('帧渲染完成，开始编码视频...');
+        }
 
         // 记录渲染结束时间
         const renderEndTime = performance.now();
         const renderTotalTime = (renderEndTime - renderStartTime) / 1000; // 转换为秒
 
-        console.log('帧渲染完成，开始编码视频...');
-        console.log(`渲染总耗时: ${renderTotalTime.toFixed(2)} 秒`);
+        console.log('视频编码完成');
+        console.log(`总耗时: ${renderTotalTime.toFixed(2)} 秒`);
 
         // 打印转场统计信息（可选）
         TransitionElement.printTransitionStats();
 
-      // 收集所有音频元素（在渲染帧的同时可以提前准备）
+        // 收集所有音频元素（在渲染帧的同时可以提前准备）
       // 注意：需要在渲染前收集，因为 CompositionElement 可能在渲染时才初始化
       let audioConfigs = [];
       
@@ -171,13 +187,20 @@ export class VideoExporter {
         console.log(`收集到 ${audioConfigs.length} 个音频元素`);
       }
       
-      // 并行处理：同时进行视频编码和音频处理
-      // 这样可以充分利用 CPU 和 I/O 资源，提升整体速度
-      const videoEncodingPromise = this.ffmpeg.imagesToVideo(framePattern, outputPath, {
-        fps: fps,
-        width: composition.width,
-        height: composition.height,
-      });
+      // 如果使用文件模式，需要编码视频（管道模式已经在渲染时完成编码）
+      let videoEncodingPromise = Promise.resolve();
+      if (!usePipe && tempDir) {
+        // 文件模式：需要编码视频
+        const framePattern = path.join(tempDir, 'frame_%04d.png');
+        videoEncodingPromise = this.ffmpeg.imagesToVideo(framePattern, outputPath, {
+          fps: fps,
+          width: composition.width,
+          height: composition.height,
+        }).then(() => {
+          // 清理临时文件
+          return fs.remove(tempDir).catch(() => {});
+        });
+      }
 
       let audioProcessingPromise = Promise.resolve(null);
       let hasAudio = false;
@@ -220,8 +243,26 @@ export class VideoExporter {
       // 如果有音频，添加到视频
       if (hasAudio) {
         console.log('将音频添加到视频...');
+        // 在管道模式下，视频已经编码完成，需要重命名
+        // 在文件模式下，视频编码在 videoEncodingPromise 中完成
         const tempVideoPath = outputPath.replace(/\.(mp4|webm)$/, '_temp.$1');
-        await fs.move(outputPath, tempVideoPath);
+        if (usePipe) {
+          // 管道模式：视频已经存在，直接重命名
+          await fs.move(outputPath, tempVideoPath);
+        } else {
+          // 文件模式：视频编码在 videoEncodingPromise 中完成，需要等待
+          // 如果视频文件不存在，说明编码还没完成，等待一下
+          let retries = 0;
+          while (!await fs.pathExists(outputPath) && retries < 10) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            retries++;
+          }
+          if (await fs.pathExists(outputPath)) {
+            await fs.move(outputPath, tempVideoPath);
+          } else {
+            throw new Error('视频文件未生成');
+          }
+        }
         
         // 优先使用原始音频路径（如果存在且有效）
         if (audioPath && await fs.pathExists(audioPath)) {
@@ -257,9 +298,6 @@ export class VideoExporter {
         await fs.remove(tempVideoPath);
       }
 
-      // 清理临时文件
-      await fs.remove(tempDir);
-
       // 重置转场统计信息
       TransitionElement.resetTransitionStats();
 
@@ -268,8 +306,6 @@ export class VideoExporter {
     } catch (error) {
       console.error('视频导出失败:', error);
       console.error('错误堆栈:', error.stack);
-      // 清理临时文件
-      await fs.remove(tempDir).catch(() => {});
       throw error;
     } finally {
       if (this.renderer) {
@@ -279,7 +315,59 @@ export class VideoExporter {
   }
 
   /**
-   * 串行渲染所有帧
+   * 使用管道模式渲染所有帧（直接写入 FFmpeg，不保存中间文件）
+   */
+  async renderFramesWithPipe(composition, totalFrames, startTime, fps, outputPath, backgroundColor, ffmpegOptions) {
+    // 启动 FFmpeg 管道进程
+    const pipe = await this.ffmpeg.imagesToVideoPipe(outputPath, ffmpegOptions);
+    
+    try {
+      for (let frame = 0; frame < totalFrames; frame++) {
+        try {
+          const time = startTime + frame / fps;
+
+          // 渲染帧（传入背景色）
+          await this.renderer.renderFrame(composition.timeline.getLayers(), time, backgroundColor);
+
+          // 获取 PNG buffer
+          const buffer = this.renderer.getCanvasBuffer();
+          
+          // 直接写入 FFmpeg 管道
+          await pipe.writeFrame(buffer);
+
+          // 显示进度
+          if (frame % 30 === 0 || frame === totalFrames - 1) {
+            const progress = ((frame + 1) / totalFrames * 100).toFixed(1);
+            console.log(`渲染进度: ${progress}% (${frame + 1}/${totalFrames})`);
+          }
+        } catch (error) {
+          console.error(`渲染第 ${frame + 1} 帧时出错:`, error);
+          console.error('错误堆栈:', error.stack);
+          // 关闭管道
+          pipe.end();
+          throw error;
+        }
+      }
+      
+      // 所有帧写入完成，关闭管道
+      pipe.end();
+      
+      // 等待 FFmpeg 编码完成
+      await pipe.finish;
+    } catch (error) {
+      // 确保关闭管道
+      try {
+        pipe.end();
+      } catch (e) {
+        // 忽略关闭错误
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 串行渲染所有帧（保存到文件）
+   * @param {string|null} tempDir - 临时目录，如果为 null 则不保存文件（仅渲染）
    */
   async renderFramesSerial(composition, totalFrames, startTime, fps, tempDir, backgroundColor) {
     for (let frame = 0; frame < totalFrames; frame++) {
@@ -290,10 +378,12 @@ export class VideoExporter {
         // 渲染帧（传入背景色）
         await this.renderer.renderFrame(composition.timeline.getLayers(), time, backgroundColor);
 
-        // 保存帧
-        const framePath = path.join(tempDir, `frame_${frameNumber.toString().padStart(4, '0')}.png`);
-        const buffer = this.renderer.getCanvasBuffer();
-        await fs.writeFile(framePath, buffer);
+        // 如果提供了 tempDir，保存帧
+        if (tempDir) {
+          const framePath = path.join(tempDir, `frame_${frameNumber.toString().padStart(4, '0')}.png`);
+          const buffer = this.renderer.getCanvasBuffer();
+          await fs.writeFile(framePath, buffer);
+        }
 
         // 显示进度
         if (frame % 30 === 0 || frame === totalFrames - 1) {

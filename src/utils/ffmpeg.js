@@ -69,6 +69,105 @@ export class FFmpegUtil {
   }
 
   /**
+   * 通过管道将图片数据直接写入 FFmpeg（不保存中间文件）
+   * @param {string} outputPath - 输出视频路径
+   * @param {Object} options - 选项
+   * @returns {Object} 返回 { process, writeFrame } 对象
+   *   - process: FFmpeg 进程
+   *   - writeFrame: 函数，用于写入一帧 PNG buffer
+   *   - finish: Promise，等待编码完成
+   */
+  async imagesToVideoPipe(outputPath, options = {}) {
+    await this.checkFFmpeg();
+
+    const {
+      fps = 30,
+      width,
+      height,
+      codec = this.config.codec,
+      preset = this.config.preset,
+      crf = this.config.crf,
+      pixelFormat = this.config.pixelFormat,
+    } = options;
+
+    const args = [
+      '-y', // 覆盖输出文件
+      '-hide_banner', // 隐藏版本信息横幅
+      '-loglevel', 'error', // 只显示错误信息
+      '-f', 'image2pipe', // 从管道读取图片
+      '-vcodec', 'png', // 输入格式为 PNG
+      '-framerate', fps.toString(),
+      '-i', '-', // 从 stdin 读取
+      '-c:v', codec,
+      '-preset', preset,
+      '-crf', crf.toString(),
+      '-pix_fmt', pixelFormat,
+    ];
+
+    if (width && height) {
+      args.push('-s', `${width}x${height}`);
+    }
+
+    args.push(outputPath);
+
+    // 启动 FFmpeg 进程，stdin 作为管道
+    const process = execa('ffmpeg', args, {
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    // 创建 Promise 来等待编码完成
+    let finishPromise = null;
+    let finishResolve = null;
+    let finishReject = null;
+
+    finishPromise = new Promise((resolve, reject) => {
+      finishResolve = resolve;
+      finishReject = reject;
+    });
+
+    // 监听进程完成
+    process.then(() => {
+      if (finishResolve) finishResolve(outputPath);
+    }).catch((error) => {
+      if (finishReject) finishReject(new Error(`FFmpeg encoding failed: ${error.message}`));
+    });
+
+    // 写入帧的函数
+    const writeFrame = async (pngBuffer) => {
+      if (process.stdin && !process.stdin.destroyed) {
+        try {
+          await new Promise((resolve, reject) => {
+            process.stdin.write(pngBuffer, (error) => {
+              if (error) reject(error);
+              else resolve();
+            });
+          });
+        } catch (error) {
+          throw new Error(`Failed to write frame to FFmpeg: ${error.message}`);
+        }
+      } else {
+        throw new Error('FFmpeg stdin is closed');
+      }
+    };
+
+    // 结束写入的函数
+    const end = () => {
+      if (process.stdin && !process.stdin.destroyed) {
+        process.stdin.end();
+      }
+    };
+
+    return {
+      process,
+      writeFrame,
+      end,
+      finish: finishPromise,
+    };
+  }
+
+  /**
    * 添加音频到视频
    * @param {string} videoPath - 视频路径
    * @param {string} audioPath - 音频路径
