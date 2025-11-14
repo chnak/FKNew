@@ -153,14 +153,14 @@ export default function renderBlob(element, data, x, y, width, height, time, con
   for (let i = 0; i < element.blobBalls.length; i++) {
     const ball = element.blobBalls[i];
     updateBlobShape(ball);
-    drawBlobBall(ball, element);
+    drawBlobBall(ball, element, cfg);
   }
 }
 
 /**
  * 绘制 Blob 球体路径
  */
-function drawBlobBall(ball, element) {
+function drawBlobBall(ball, element, cfg) {
   // 确保球体有效
   if (!ball || !ball.point || !ball.radius || ball.radius <= 0) {
     return; // 如果球体无效，跳过绘制
@@ -168,7 +168,7 @@ function drawBlobBall(ball, element) {
   
   // 选择颜色（从粒子颜色数组或使用随机色相）
   let fillColor;
-    if (cfg.particleColors && cfg.particleColors.length > 0) {
+    if (cfg && cfg.particleColors && cfg.particleColors.length > 0) {
       const colorIndex = ball.colorIndex % cfg.particleColors.length;
       fillColor = cfg.particleColors[colorIndex];
     } else {
