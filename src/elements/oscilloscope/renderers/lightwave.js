@@ -1,9 +1,34 @@
 import paper from 'paper-jsdom-canvas';
 
 /**
- * 光波扩散渲染器（光波从中心扩散）
+ * 光波扩散样式默认配置
  */
-export default function renderLightwave(element, data, x, y, width, height, time) {
+export const defaultConfig = {
+  lightwaveCount: 8, // 光波数量
+  lightwaveSpeed: 2.0, // 光波速度
+  lightwaveSegments: 64, // 光波分段数
+  particleColors: [ // 颜色数组
+    '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+    '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+    '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+  ],
+};
+
+/**
+ * 光波扩散渲染器（光波从中心扩散）
+ * @param {Object} element - 元素实例
+ * @param {Array} data - 波形数据
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @param {number} time - 当前时间
+ * @param {Object} config - 配置对象（合并了默认配置和用户配置）
+ */
+export default function renderLightwave(element, data, x, y, width, height, time, config = {}) {
+  // 合并默认配置
+  const cfg = { ...defaultConfig, ...config };
+  
   if (!data || data.length === 0) return;
   
   const centerX = x + width / 2;
@@ -18,8 +43,8 @@ export default function renderLightwave(element, data, x, y, width, height, time
   avgAmplitude = (avgAmplitude / data.length) * element.sensitivity;
   
   // 光波数量
-  const waveCount = element.lightwaveCount || 8;
-  const waveSpeed = element.lightwaveSpeed || 2.0;
+  const waveCount = cfg.lightwaveCount;
+  const waveSpeed = cfg.lightwaveSpeed;
   
   // 绘制多个光波
   for (let i = 0; i < waveCount; i++) {
@@ -28,7 +53,7 @@ export default function renderLightwave(element, data, x, y, width, height, time
     
     if (radius > 0) {
       // 根据音频数据调整光波形状
-      const segments = element.lightwaveSegments || 64;
+      const segments = cfg.lightwaveSegments;
       const path = new paper.Path();
       path.strokeColor = element.waveColor;
       path.strokeWidth = 3;
@@ -36,9 +61,9 @@ export default function renderLightwave(element, data, x, y, width, height, time
       path.closed = true;
       
       // 选择颜色
-      if (element.particleColors && element.particleColors.length > 0) {
-        const colorIndex = Math.floor((waveProgress * waveCount + i) % element.particleColors.length);
-        path.strokeColor = element.particleColors[colorIndex];
+      if (cfg.particleColors && cfg.particleColors.length > 0) {
+        const colorIndex = Math.floor((waveProgress * waveCount + i) % cfg.particleColors.length);
+        path.strokeColor = cfg.particleColors[colorIndex];
       }
       
       for (let j = 0; j < segments; j++) {
@@ -99,8 +124,8 @@ export default function renderLightwave(element, data, x, y, width, height, time
     radius: centerSize
   });
   
-  if (element.particleColors && element.particleColors.length > 0) {
-    centerCircle.fillColor = element.particleColors[0];
+  if (cfg.particleColors && cfg.particleColors.length > 0) {
+    centerCircle.fillColor = cfg.particleColors[0];
   } else {
     centerCircle.fillColor = element.waveColor;
   }

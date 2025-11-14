@@ -1,11 +1,30 @@
 import paper from 'paper-jsdom-canvas';
 
 /**
- * 瀑布图波形渲染器（频谱瀑布图效果）
+ * 瀑布图样式默认配置
  */
-export default function renderWaterfall(element, data, x, y, width, height, time) {
+export const defaultConfig = {
+  waterfallHeight: 200, // 瀑布图高度
+  waterfallBands: 64, // 频段数量
+};
+
+/**
+ * 瀑布图波形渲染器（频谱瀑布图效果）
+ * @param {Object} element - 元素实例
+ * @param {Array} data - 波形数据
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @param {number} time - 当前时间
+ * @param {Object} config - 配置对象（合并了默认配置和用户配置）
+ */
+export default function renderWaterfall(element, data, x, y, width, height, time, config = {}) {
+  // 合并默认配置
+  const cfg = { ...defaultConfig, ...config };
+  
   const centerY = y + height / 2;
-  const barCount = element.waterfallBands;
+  const barCount = cfg.waterfallBands;
   const step = Math.max(1, Math.floor(data.length / barCount));
   const barWidth = width / barCount;
   const amplitude = (height / 2) * element.sensitivity;

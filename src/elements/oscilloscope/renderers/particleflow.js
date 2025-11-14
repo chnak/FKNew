@@ -1,9 +1,34 @@
 import paper from 'paper-jsdom-canvas';
 
 /**
- * 波形粒子流渲染器（粒子沿波形流动）
+ * 粒子流样式默认配置
  */
-export default function renderParticleFlow(element, data, x, y, width, height, time) {
+export const defaultConfig = {
+  flowParticleCount: 100, // 粒子流粒子数量
+  flowSpeed: 1.0, // 粒子流速度
+  showWaveform: true, // 是否显示基础波形
+  particleColors: [ // 粒子颜色数组
+    '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+    '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+    '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+  ],
+};
+
+/**
+ * 波形粒子流渲染器（粒子沿波形流动）
+ * @param {Object} element - 元素实例
+ * @param {Array} data - 波形数据
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @param {number} time - 当前时间
+ * @param {Object} config - 配置对象（合并了默认配置和用户配置）
+ */
+export default function renderParticleFlow(element, data, x, y, width, height, time, config = {}) {
+  // 合并默认配置
+  const cfg = { ...defaultConfig, ...config };
+  
   if (!data || data.length === 0) return;
   
   const centerY = y + height / 2;
@@ -13,7 +38,7 @@ export default function renderParticleFlow(element, data, x, y, width, height, t
   // 初始化粒子
   if (!element.flowParticles) {
     element.flowParticles = [];
-    const particleCount = element.flowParticleCount || 100;
+    const particleCount = cfg.flowParticleCount;
     const dataLength = data.length || 1000; // 默认值，避免初始化时出错
     
     for (let i = 0; i < particleCount; i++) {
@@ -21,7 +46,7 @@ export default function renderParticleFlow(element, data, x, y, width, height, t
         position: Math.random() * dataLength, // 在波形上的位置
         speed: 0.3 + Math.random() * 0.7, // 流动速度
         size: 2 + Math.random() * 4, // 粒子大小
-        colorIndex: Math.floor(Math.random() * (element.particleColors?.length || 10)),
+        colorIndex: Math.floor(Math.random() * (cfg.particleColors?.length || 10)),
         life: Math.random() // 生命周期（0-1）
       });
     }
@@ -30,7 +55,7 @@ export default function renderParticleFlow(element, data, x, y, width, height, t
   // 更新粒子
   for (let particle of element.flowParticles) {
     // 更新位置
-    particle.position += particle.speed * (element.flowSpeed || 1.0);
+    particle.position += particle.speed * cfg.flowSpeed;
     if (particle.position >= data.length) {
       particle.position = 0;
       particle.life = 0; // 重置生命周期
@@ -54,9 +79,9 @@ export default function renderParticleFlow(element, data, x, y, width, height, t
       
       // 选择颜色
       let particleColor;
-      if (element.particleColors && element.particleColors.length > 0) {
-        const colorIndex = (particle.colorIndex + Math.floor(particle.position / 10)) % element.particleColors.length;
-        particleColor = element.particleColors[colorIndex];
+      if (cfg.particleColors && cfg.particleColors.length > 0) {
+        const colorIndex = (particle.colorIndex + Math.floor(particle.position / 10)) % cfg.particleColors.length;
+        particleColor = cfg.particleColors[colorIndex];
       } else {
         const hue = (particle.position / data.length) * 360;
         particleColor = {
@@ -105,7 +130,7 @@ export default function renderParticleFlow(element, data, x, y, width, height, t
   }
   
   // 绘制基础波形路径（可选，作为背景）
-  if (element.showWaveform !== false) {
+  if (cfg.showWaveform !== false) {
     const path = new paper.Path();
     path.strokeColor = element.waveColor;
     path.strokeWidth = element.lineWidth * 0.5;

@@ -1,9 +1,32 @@
 import paper from 'paper-jsdom-canvas';
 
 /**
- * 3D旋转波形渲染器（透视旋转效果）
+ * 3D旋转样式默认配置
  */
-export default function renderRotating3D(element, data, x, y, width, height, time) {
+export const defaultConfig = {
+  rotationSpeed: 1.0, // 旋转速度
+  particleColors: [ // 颜色数组
+    '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+    '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+    '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+  ],
+};
+
+/**
+ * 3D旋转波形渲染器（透视旋转效果）
+ * @param {Object} element - 元素实例
+ * @param {Array} data - 波形数据
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @param {number} time - 当前时间
+ * @param {Object} config - 配置对象（合并了默认配置和用户配置）
+ */
+export default function renderRotating3D(element, data, x, y, width, height, time, config = {}) {
+  // 合并默认配置
+  const cfg = { ...defaultConfig, ...config };
+  
   if (!data || data.length === 0) return;
   
   const centerX = x + width / 2;
@@ -11,7 +34,7 @@ export default function renderRotating3D(element, data, x, y, width, height, tim
   const maxRadius = Math.min(width, height) / 2 - 20;
   
   // 3D旋转角度（随时间旋转）
-  const rotationY = (time * (element.rotationSpeed || 1.0)) % (Math.PI * 2);
+  const rotationY = (time * cfg.rotationSpeed) % (Math.PI * 2);
   const rotationX = Math.sin(time * 0.5) * 0.3; // 轻微的X轴摆动
   
   // 计算平均振幅
@@ -83,9 +106,9 @@ export default function renderRotating3D(element, data, x, y, width, height, tim
   }
   
   // 根据深度调整颜色
-  if (element.particleColors && element.particleColors.length > 0) {
-    const colorIndex = Math.floor((rotationY / (Math.PI * 2)) * element.particleColors.length) % element.particleColors.length;
-    path.strokeColor = element.particleColors[colorIndex];
+  if (cfg.particleColors && cfg.particleColors.length > 0) {
+    const colorIndex = Math.floor((rotationY / (Math.PI * 2)) * cfg.particleColors.length) % cfg.particleColors.length;
+    path.strokeColor = cfg.particleColors[colorIndex];
   }
   
   // 绘制高亮点（前面的点更亮）
@@ -99,10 +122,10 @@ export default function renderRotating3D(element, data, x, y, width, height, tim
       radius: size
     });
     
-    if (element.particleColors && element.particleColors.length > 0) {
-      const colorIndex = Math.floor((p.originalIndex / pointCount) * element.particleColors.length) % element.particleColors.length;
-      circle.fillColor = element.particleColors[colorIndex];
-    } else {
+      if (cfg.particleColors && cfg.particleColors.length > 0) {
+        const colorIndex = Math.floor((p.originalIndex / pointCount) * cfg.particleColors.length) % cfg.particleColors.length;
+        circle.fillColor = cfg.particleColors[colorIndex];
+      } else {
       circle.fillColor = element.waveColor;
     }
     circle.fillColor.alpha = alpha;

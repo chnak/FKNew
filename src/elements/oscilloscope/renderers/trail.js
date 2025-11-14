@@ -1,9 +1,34 @@
 import paper from 'paper-jsdom-canvas';
 
 /**
- * 粒子轨迹追踪渲染器（粒子沿波形移动留下轨迹）
+ * 轨迹追踪样式默认配置
  */
-export default function renderTrail(element, data, x, y, width, height, time) {
+export const defaultConfig = {
+  trailParticleCount: 20, // 轨迹粒子数量
+  trailLength: 50, // 轨迹长度
+  trailSpeed: 1.0, // 轨迹移动速度
+  particleColors: [ // 颜色数组
+    '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+    '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+    '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+  ],
+};
+
+/**
+ * 粒子轨迹追踪渲染器（粒子沿波形移动留下轨迹）
+ * @param {Object} element - 元素实例
+ * @param {Array} data - 波形数据
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @param {number} time - 当前时间
+ * @param {Object} config - 配置对象（合并了默认配置和用户配置）
+ */
+export default function renderTrail(element, data, x, y, width, height, time, config = {}) {
+  // 合并默认配置
+  const cfg = { ...defaultConfig, ...config };
+  
   if (!data || data.length === 0) return;
   
   const centerY = y + height / 2;
@@ -13,7 +38,7 @@ export default function renderTrail(element, data, x, y, width, height, time) {
   // 初始化轨迹状态
   if (!element.trailParticles) {
     element.trailParticles = [];
-    const particleCount = element.trailParticleCount || 20;
+    const particleCount = cfg.trailParticleCount;
     const dataLength = data.length || 1000; // 默认值，避免初始化时出错
     
     for (let i = 0; i < particleCount; i++) {
@@ -29,7 +54,7 @@ export default function renderTrail(element, data, x, y, width, height, time) {
   // 更新粒子位置和轨迹
   for (let particle of element.trailParticles) {
     // 更新位置
-    particle.position += particle.speed * (element.trailSpeed || 1.0);
+    particle.position += particle.speed * cfg.trailSpeed;
     if (particle.position >= data.length) {
       particle.position = 0;
       particle.trail = []; // 重置轨迹
@@ -48,7 +73,7 @@ export default function renderTrail(element, data, x, y, width, height, time) {
       });
       
       // 限制轨迹长度
-      const maxTrailLength = element.trailLength || 50;
+      const maxTrailLength = cfg.trailLength;
       if (particle.trail.length > maxTrailLength) {
         particle.trail.shift();
       }
@@ -61,9 +86,9 @@ export default function renderTrail(element, data, x, y, width, height, time) {
     
     // 选择颜色
     let trailColor;
-    if (element.particleColors && element.particleColors.length > 0) {
-      const colorIndex = particle.colorIndex % element.particleColors.length;
-      trailColor = element.particleColors[colorIndex];
+    if (cfg.particleColors && cfg.particleColors.length > 0) {
+      const colorIndex = particle.colorIndex % cfg.particleColors.length;
+      trailColor = cfg.particleColors[colorIndex];
     } else {
       trailColor = element.waveColor;
     }

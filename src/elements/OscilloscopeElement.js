@@ -28,75 +28,17 @@ export class OscilloscopeElement extends BaseElement {
     // 音频文件路径
     this.audioPath = config.audioPath || config.src || '';
     
-    // 示波器样式配置
+    // 示波器通用样式配置（所有样式共享）
     this.waveColor = config.waveColor || config.color || '#00ff00'; // 波形颜色
     this.backgroundColor = config.backgroundColor || 'rgba(0, 0, 0, 0.3)'; // 背景颜色
     this.lineWidth = config.lineWidth || 2; // 线条宽度
     this.smoothing = config.smoothing !== undefined ? config.smoothing : 0.3; // 平滑度 (0-1)
     this.mirror = config.mirror !== undefined ? config.mirror : true; // 是否镜像显示
     this.style = config.style || 'line'; // 样式: 'line', 'bars', 'circle', 'spectrum', 'particles', 'waterfall', 'spiral', 'ripple', 'grid', 'explosion', 'blob', 'rotating3d', 'trail', 'weave', 'lightwave', 'particleflow'
-    this.barWidth = config.barWidth || 2; // 柱状图宽度（当 style 为 'bars' 时）
-    this.barGap = config.barGap || 1; // 柱状图间距
     this.sensitivity = config.sensitivity !== undefined ? config.sensitivity : 1.0; // 灵敏度
     
-    // 粒子/圆点样式配置
-    this.particleCount = config.particleCount || 50; // 圆点数量
-    this.particleMinSize = config.particleMinSize || 3; // 圆点最小尺寸
-    this.particleMaxSize = config.particleMaxSize || 15; // 圆点最大尺寸
-    this.particleColors = config.particleColors || [ // 圆点颜色数组（渐变色）
-      '#ff0080', '#ff0080', '#ff4080', '#ff4080',
-      '#ff8000', '#ff8000', '#ffc000', '#ffc000',
-      '#ffff00', '#ffff00', '#80ff00', '#80ff00',
-      '#00ff80', '#00ff80', '#00ffff', '#00ffff',
-      '#0080ff', '#0080ff', '#8000ff', '#8000ff',
-    ];
-    this.particleTrail = config.particleTrail !== undefined ? config.particleTrail : true; // 是否显示拖尾效果
-    this.particleTrailLength = config.particleTrailLength || 5; // 拖尾长度
-    
-    // 瀑布图样式配置
-    this.waterfallHeight = config.waterfallHeight || 200; // 瀑布图高度
-    this.waterfallBands = config.waterfallBands || 64; // 频段数量
-    
-    // 螺旋样式配置
-    this.spiralTurns = config.spiralTurns || 3; // 螺旋圈数
-    this.spiralRadius = config.spiralRadius || 200; // 螺旋半径
-    
-    // 涟漪样式配置
-    this.rippleCount = config.rippleCount || 5; // 涟漪数量
-    this.rippleSpeed = config.rippleSpeed || 1.0; // 涟漪速度
-    
-    // 网格样式配置
-    this.gridRows = config.gridRows || 8; // 网格行数
-    this.gridCols = config.gridCols || 16; // 网格列数
-    
-    // 爆炸样式配置
-    this.explosionParticles = config.explosionParticles || 100; // 爆炸粒子数
-    
-    // Blob 球体碰撞样式配置
-    this.blobBallCount = config.blobBallCount || 12; // Blob 球体数量（默认12个）
-    
-    // 3D旋转样式配置
-    this.rotationSpeed = config.rotationSpeed || 1.0; // 旋转速度
-    
-    // 轨迹追踪样式配置
-    this.trailParticleCount = config.trailParticleCount || 20; // 轨迹粒子数量
-    this.trailLength = config.trailLength || 50; // 轨迹长度
-    this.trailSpeed = config.trailSpeed || 1.0; // 轨迹移动速度
-    
-    // 波形编织样式配置
-    this.weaveLayers = config.weaveLayers || 5; // 编织层数
-    this.weaveLayerSpacing = config.weaveLayerSpacing || 30; // 层间距
-    this.weaveSpeed = config.weaveSpeed || 0.5; // 编织动画速度
-    
-    // 光波扩散样式配置
-    this.lightwaveCount = config.lightwaveCount || 8; // 光波数量
-    this.lightwaveSpeed = config.lightwaveSpeed || 2.0; // 光波速度
-    this.lightwaveSegments = config.lightwaveSegments || 64; // 光波分段数
-    
-    // 粒子流样式配置
-    this.flowParticleCount = config.flowParticleCount || 100; // 粒子流粒子数量
-    this.flowSpeed = config.flowSpeed || 1.0; // 粒子流速度
-    this.showWaveform = config.showWaveform !== undefined ? config.showWaveform : true; // 是否显示基础波形
+    // 注意：特定样式的配置项已移到对应的渲染器文件中
+    // 这些配置项仍然可以通过 config 传入，但会在 render 时传递给对应的渲染器
     
     // 音频数据
     this.audioData = null; // 解析后的音频波形数据
@@ -359,16 +301,16 @@ export class OscilloscopeElement extends BaseElement {
     let height = state.height || 200;
 
     if (typeof x === 'string') {
-      x = toPixels(x, context.width, 'x');
+      x = toPixels(x, context, 'x');
     }
     if (typeof y === 'string') {
-      y = toPixels(y, context.height, 'y');
+      y = toPixels(y, context, 'y');
     }
     if (typeof width === 'string') {
-      width = toPixels(width, context.width, 'x');
+      width = toPixels(width, context, 'width');
     }
     if (typeof height === 'string') {
-      height = toPixels(height, context.height, 'y');
+      height = toPixels(height, context, 'height');
     }
 
     // 处理 anchor
@@ -419,17 +361,107 @@ export class OscilloscopeElement extends BaseElement {
     const renderer = getRenderer(styleName) || getRenderer('line');
     
     if (renderer) {
-      // 调用渲染器函数，传递 element, data, x, y, width, height, time
-      renderer(this, waveformData, rectX, rectY, width, height, time);
+      // 从 config 中提取该样式相关的配置项
+      const styleConfig = this._extractStyleConfig(styleName);
+      
+      // 调用渲染器函数，传递 element, data, x, y, width, height, time, config
+      // 注意：所有渲染器都接受 time 和 config 参数（即使不使用）
+      renderer(this, waveformData, rectX, rectY, width, height, time, styleConfig);
     } else {
       console.warn(`[OscilloscopeElement] 未找到渲染器: ${styleName}，使用默认 line 渲染器`);
       const defaultRenderer = getRenderer('line');
       if (defaultRenderer) {
-        defaultRenderer(this, waveformData, rectX, rectY, width, height);
+        defaultRenderer(this, waveformData, rectX, rectY, width, height, time, {});
       }
     }
 
     return null;
+  }
+
+  /**
+   * 从 config 中提取特定样式相关的配置项
+   * @param {string} styleName - 样式名称
+   * @returns {Object} 样式配置对象
+   */
+  _extractStyleConfig(styleName) {
+    const config = this.config || {};
+    const styleConfig = {};
+    
+    // 根据样式名称提取对应的配置项
+    switch (styleName) {
+      case 'particles':
+      case 'dots':
+        if (config.particleCount !== undefined) styleConfig.particleCount = config.particleCount;
+        if (config.particleMinSize !== undefined) styleConfig.particleMinSize = config.particleMinSize;
+        if (config.particleMaxSize !== undefined) styleConfig.particleMaxSize = config.particleMaxSize;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        if (config.particleTrail !== undefined) styleConfig.particleTrail = config.particleTrail;
+        if (config.particleTrailLength !== undefined) styleConfig.particleTrailLength = config.particleTrailLength;
+        break;
+      case 'waterfall':
+        if (config.waterfallHeight !== undefined) styleConfig.waterfallHeight = config.waterfallHeight;
+        if (config.waterfallBands !== undefined) styleConfig.waterfallBands = config.waterfallBands;
+        break;
+      case 'spiral':
+        if (config.spiralTurns !== undefined) styleConfig.spiralTurns = config.spiralTurns;
+        if (config.spiralRadius !== undefined) styleConfig.spiralRadius = config.spiralRadius;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      case 'ripple':
+        if (config.rippleCount !== undefined) styleConfig.rippleCount = config.rippleCount;
+        if (config.rippleSpeed !== undefined) styleConfig.rippleSpeed = config.rippleSpeed;
+        break;
+      case 'grid':
+        if (config.gridRows !== undefined) styleConfig.gridRows = config.gridRows;
+        if (config.gridCols !== undefined) styleConfig.gridCols = config.gridCols;
+        break;
+      case 'explosion':
+        if (config.explosionParticles !== undefined) styleConfig.explosionParticles = config.explosionParticles;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      case 'bars':
+        if (config.barWidth !== undefined) styleConfig.barWidth = config.barWidth;
+        if (config.barGap !== undefined) styleConfig.barGap = config.barGap;
+        break;
+      case 'blob':
+        if (config.blobBallCount !== undefined) styleConfig.blobBallCount = config.blobBallCount;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      case 'rotating3d':
+        if (config.rotationSpeed !== undefined) styleConfig.rotationSpeed = config.rotationSpeed;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      case 'trail':
+        if (config.trailParticleCount !== undefined) styleConfig.trailParticleCount = config.trailParticleCount;
+        if (config.trailLength !== undefined) styleConfig.trailLength = config.trailLength;
+        if (config.trailSpeed !== undefined) styleConfig.trailSpeed = config.trailSpeed;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      case 'weave':
+        if (config.weaveLayers !== undefined) styleConfig.weaveLayers = config.weaveLayers;
+        if (config.weaveLayerSpacing !== undefined) styleConfig.weaveLayerSpacing = config.weaveLayerSpacing;
+        if (config.weaveSpeed !== undefined) styleConfig.weaveSpeed = config.weaveSpeed;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      case 'lightwave':
+        if (config.lightwaveCount !== undefined) styleConfig.lightwaveCount = config.lightwaveCount;
+        if (config.lightwaveSpeed !== undefined) styleConfig.lightwaveSpeed = config.lightwaveSpeed;
+        if (config.lightwaveSegments !== undefined) styleConfig.lightwaveSegments = config.lightwaveSegments;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      case 'particleflow':
+        if (config.flowParticleCount !== undefined) styleConfig.flowParticleCount = config.flowParticleCount;
+        if (config.flowSpeed !== undefined) styleConfig.flowSpeed = config.flowSpeed;
+        if (config.showWaveform !== undefined) styleConfig.showWaveform = config.showWaveform;
+        if (config.particleColors !== undefined) styleConfig.particleColors = config.particleColors;
+        break;
+      // 其他样式可以在这里添加
+      default:
+        // 对于没有特定配置的样式，返回空对象
+        break;
+    }
+    
+    return styleConfig;
   }
 
   /**

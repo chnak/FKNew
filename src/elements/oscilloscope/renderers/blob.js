@@ -1,16 +1,39 @@
 import paper from 'paper-jsdom-canvas';
 
 /**
+ * Blob 样式默认配置
+ */
+export const defaultConfig = {
+  blobBallCount: 12, // Blob 球体数量
+  particleColors: [ // 颜色数组
+    '#ff0080', '#ff4080', '#ff8000', '#ffc000',
+    '#ffff00', '#80ff00', '#00ff80', '#00ffff',
+    '#0080ff', '#8000ff', '#ff00ff', '#ff0080',
+  ],
+};
+
+/**
  * Blob 球体碰撞变形示波器渲染器
  * 基于 kynd.info 2014 的球体碰撞效果，结合音频数据
+ * @param {Object} element - 元素实例
+ * @param {Array} data - 波形数据
+ * @param {number} x - X坐标
+ * @param {number} y - Y坐标
+ * @param {number} width - 宽度
+ * @param {number} height - 高度
+ * @param {number} time - 当前时间
+ * @param {Object} config - 配置对象（合并了默认配置和用户配置）
  */
-export default function renderBlob(element, data, x, y, width, height, time) {
+export default function renderBlob(element, data, x, y, width, height, time, config = {}) {
+  // 合并默认配置
+  const cfg = { ...defaultConfig, ...config };
+  
   const centerX = x + width / 2;
   const centerY = y + height / 2;
   const maxRadius = Math.min(width, height) / 2 - 20;
   
   // 将音频数据分成多个频段
-  const numBalls = element.blobBallCount || 6;
+  const numBalls = cfg.blobBallCount;
   const bands = [];
   const bandSize = Math.floor(data.length / numBalls);
   for (let i = 0; i < numBalls; i++) {
@@ -145,10 +168,10 @@ function drawBlobBall(ball, element) {
   
   // 选择颜色（从粒子颜色数组或使用随机色相）
   let fillColor;
-  if (element.particleColors && element.particleColors.length > 0) {
-    const colorIndex = ball.colorIndex % element.particleColors.length;
-    fillColor = element.particleColors[colorIndex];
-  } else {
+    if (cfg.particleColors && cfg.particleColors.length > 0) {
+      const colorIndex = ball.colorIndex % cfg.particleColors.length;
+      fillColor = cfg.particleColors[colorIndex];
+    } else {
     fillColor = {
       hue: (ball.colorIndex * 60) % 360,
       saturation: 0.8,
