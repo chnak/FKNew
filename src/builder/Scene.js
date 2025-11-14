@@ -176,13 +176,13 @@ export class Scene {
   }
 
   /**
-   * 从 LRC 文件添加歌词字幕
+   * 从 LRC 文件添加歌词字幕（同步方式）
    * @param {string} lrcPath - LRC 文件路径
    * @param {Object} options - 字幕样式选项
-   * @returns {Promise<Scene>} 返回自身以支持链式调用
+   * @returns {Scene} 返回自身以支持链式调用
    */
-  async addLRC(lrcPath, options = {}) {
-    await LRCSubtitleBuilder.addSubtitlesFromLRC(this, lrcPath, options);
+  addLRC(lrcPath, options = {}) {
+    LRCSubtitleBuilder.addSubtitlesFromLRC(this, lrcPath, options);
     return this;
   }
 

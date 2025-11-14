@@ -5,6 +5,8 @@ import { ElementType } from '../types/enums.js';
 import { toFontSizePixels, toPixels } from '../utils/unit-converter.js';
 import { getDefaultFontFamily, isFontRegistered } from '../utils/font-manager.js';
 import { TextSplitter } from '../utils/text-splitter.js';
+import { FadeAnimation } from '../animations/FadeAnimation.js';
+import { createCanvas, Image } from 'canvas';
 import paper from 'paper-jsdom-canvas';
 
 /**
@@ -150,15 +152,15 @@ export class TextElement extends BaseElement {
       const hasAnyAnimation = this.originalAnimations && Array.isArray(this.originalAnimations) && this.originalAnimations.length > 0;
       
       if (!hasAnyAnimation) {
-        // 使用预设动画配置，添加默认淡入动画
-        segmentElement.addAnimation({
-          type: 'fade',
+        // 创建默认淡入动画实例
+        const fadeAnimation = new FadeAnimation({
           fromOpacity: 0,
           toOpacity: 1,
           duration: this.splitDuration || 0.3,
           startTime: 0,
           easing: 'easeOut',
         });
+        segmentElement.addAnimation(fadeAnimation);
       }
       
       // 不预先应用动画的初始状态，让动画在开始时才应用
@@ -388,10 +390,57 @@ export class TextElement extends BaseElement {
       applyPosition: false, // 位置已经通过 pointText.point 设置了
     });
 
-    // 如果启用了描边
+    // 应用描边样式（使用 Paper.js 原生属性）
     if (state.stroke && state.strokeWidth > 0) {
       pointText.strokeColor = state.strokeColor || '#000000';
       pointText.strokeWidth = state.strokeWidth || 2;
+      
+      // 虚线样式
+      const strokeStyle = state.strokeStyle || 'solid';
+      if (strokeStyle === 'dashed' || strokeStyle === 'dotted') {
+        const dashArray = state.strokeDashArray || (strokeStyle === 'dotted' ? [2, 2] : [5, 5]);
+        if (Array.isArray(dashArray) && dashArray.length >= 2) {
+          pointText.dashArray = dashArray;
+        }
+        if (state.strokeDashOffset !== undefined) {
+          pointText.dashOffset = state.strokeDashOffset;
+        }
+      }
+      
+      // 线帽样式
+      if (state.strokeCap) {
+        pointText.strokeCap = state.strokeCap;
+      }
+      
+      // 连接样式
+      if (state.strokeJoin) {
+        pointText.strokeJoin = state.strokeJoin;
+      }
+      
+      // 尖角限制
+      if (state.strokeMiterLimit !== undefined) {
+        pointText.miterLimit = state.strokeMiterLimit;
+      }
+    }
+
+    // 应用文本阴影效果（使用 Paper.js 原生属性）
+    if (state.textShadow) {
+      const shadowColor = state.textShadowColor || '#000000';
+      const shadowBlur = state.textShadowBlur || 0;
+      const shadowOffsetX = state.textShadowOffsetX || 2;
+      const shadowOffsetY = state.textShadowOffsetY || 2;
+      
+      // 设置阴影颜色
+      pointText.shadowColor = new paper.Color(shadowColor);
+      if (state.textShadowOpacity !== undefined) {
+        pointText.shadowColor.alpha = state.textShadowOpacity;
+      }
+      
+      // 设置阴影模糊
+      pointText.shadowBlur = shadowBlur;
+      
+      // 设置阴影偏移
+      pointText.shadowOffset = new paper.Point(shadowOffsetX, shadowOffsetY);
     }
 
     // 添加到 layer

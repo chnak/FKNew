@@ -53,6 +53,23 @@ export const DEFAULT_TEXT_CONFIG = {
   stroke: false, // 是否启用描边
   strokeColor: '#000000', // 描边颜色
   strokeWidth: 2, // 描边宽度
+  // Stroke Style（描边样式）
+  strokeStyle: 'solid', // 描边样式: 'solid'（实线）, 'dashed'（虚线）, 'dotted'（点线）
+  strokeDashArray: [5, 5], // 虚线模式：[线段长度, 间隔长度]
+  strokeDashOffset: 0, // 虚线偏移量
+  strokeCap: 'butt', // 线帽样式: 'butt'（平头）, 'round'（圆头）, 'square'（方头）
+  strokeJoin: 'miter', // 连接样式: 'miter'（尖角）, 'round'（圆角）, 'bevel'（斜角）
+  strokeMiterLimit: 4, // 尖角限制（仅当 strokeJoin 为 'miter' 时有效）
+  // 文本阴影效果
+  textShadow: false, // 是否启用文本阴影
+  textShadowColor: '#000000', // 阴影颜色
+  textShadowOffsetX: 2, // 阴影 X 偏移
+  textShadowOffsetY: 2, // 阴影 Y 偏移
+  textShadowBlur: 0, // 阴影模糊半径
+  textShadowOpacity: 0.5, // 阴影透明度 (0-1)
+  // Shadow Style（阴影样式）
+  textShadowStyle: 'outer', // 阴影样式: 'outer'（外阴影）, 'inner'（内阴影）
+  textShadowSpread: 0, // 阴影扩散（类似 CSS box-shadow 的 spread）
 };
 
 /**

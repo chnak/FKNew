@@ -7,17 +7,17 @@ import fs from 'fs-extra';
  */
 export class LRCSubtitleBuilder {
   /**
-   * 从 LRC 文件加载字幕
+   * 从 LRC 文件加载字幕（同步方式）
    * @param {string} lrcPath - LRC 文件路径
    * @param {Object} options - 字幕样式选项
-   * @returns {Promise<Array>} 字幕元素配置数组
+   * @returns {Array} 字幕元素配置数组
    */
-  static async loadFromFile(lrcPath, options = {}) {
-    if (!await fs.pathExists(lrcPath)) {
+  static loadFromFile(lrcPath, options = {}) {
+    if (!fs.existsSync(lrcPath)) {
       throw new Error(`LRC 文件不存在: ${lrcPath}`);
     }
 
-    const content = await fs.readFile(lrcPath, 'utf-8');
+    const content = fs.readFileSync(lrcPath, 'utf-8');
     return this.loadFromContent(content, options);
   }
 
@@ -188,14 +188,14 @@ export class LRCSubtitleBuilder {
   }
 
   /**
-   * 将字幕元素添加到场景或轨道
+   * 将字幕元素添加到场景或轨道（同步方式）
    * @param {Object} sceneOrTrack - 场景或轨道对象
    * @param {string} lrcPath - LRC 文件路径
    * @param {Object} options - 字幕样式选项
-   * @returns {Promise<Object>} 返回场景或轨道对象（支持链式调用）
+   * @returns {Object} 返回场景或轨道对象（支持链式调用）
    */
-  static async addSubtitlesFromLRC(sceneOrTrack, lrcPath, options = {}) {
-    if (!await fs.pathExists(lrcPath)) {
+  static addSubtitlesFromLRC(sceneOrTrack, lrcPath, options = {}) {
+    if (!fs.existsSync(lrcPath)) {
       throw new Error(`LRC 文件不存在: ${lrcPath}`);
     }
 
@@ -203,7 +203,7 @@ export class LRCSubtitleBuilder {
     const sceneOrTrackDuration = sceneOrTrack.duration;
     
     // 将场景/轨道时长传递给 options，用于计算最后一句歌词的时长
-    const subtitleElements = await this.loadFromFile(lrcPath, {
+    const subtitleElements = this.loadFromFile(lrcPath, {
       ...options,
       sceneDuration: sceneOrTrackDuration // 传递场景/轨道时长
     });

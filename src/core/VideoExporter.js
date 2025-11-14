@@ -218,44 +218,43 @@ export class VideoExporter {
       ]);
 
       // 如果有音频，添加到视频
-      if (hasAudio && processedAudioPath && await fs.pathExists(processedAudioPath)) {
+      if (hasAudio) {
         console.log('将音频添加到视频...');
         const tempVideoPath = outputPath.replace(/\.(mp4|webm)$/, '_temp.$1');
         await fs.move(outputPath, tempVideoPath);
         
+        // 优先使用原始音频路径（如果存在且有效）
         if (audioPath && await fs.pathExists(audioPath)) {
-          // 旧方式：单个音频文件
+          // 旧方式：单个音频文件（直接使用，不删除原始文件）
           await this.ffmpeg.addAudioToVideo(tempVideoPath, audioPath, outputPath, {
             audioStartTime: startTime,
           });
-        } else {
-          // 新方式：合并后的音频
+        } else if (processedAudioPath && await fs.pathExists(processedAudioPath)) {
+          // 新方式：合并后的音频（临时文件，使用后删除）
           await this.ffmpeg.addAudioToVideo(tempVideoPath, processedAudioPath, outputPath, {
             audioStartTime: 0,
           });
           
-          // 清理临时音频文件
+          // 清理临时音频文件（只删除临时合并的音频，不删除原始音频）
           const mergedAudioDir = path.dirname(processedAudioPath);
           if (mergedAudioDir.includes('temp_audio_')) {
             await fs.remove(mergedAudioDir).catch(() => {});
-          } else {
+          } else if (processedAudioPath.includes('temp') || processedAudioPath.includes('merged')) {
+            // 只删除临时文件，不删除原始音频文件
             await fs.remove(processedAudioPath).catch(() => {});
+          }
+        } else if (audioConfigs.length > 0) {
+          // 如果音频处理失败，尝试使用第一个音频（原始文件，不删除）
+          const firstAudio = audioConfigs[0];
+          if (firstAudio && firstAudio.path && await fs.pathExists(firstAudio.path)) {
+            console.log('使用第一个音频文件...');
+            await this.ffmpeg.addAudioToVideo(tempVideoPath, firstAudio.path, outputPath, {
+              audioStartTime: firstAudio.startTime || 0,
+            });
           }
         }
         
         await fs.remove(tempVideoPath);
-      } else if (hasAudio && audioConfigs.length > 0) {
-        // 如果音频处理失败，尝试使用第一个音频
-        const firstAudio = audioConfigs[0];
-        if (firstAudio && await fs.pathExists(firstAudio.path)) {
-          console.log('使用第一个音频文件...');
-          const tempVideoPath = outputPath.replace(/\.(mp4|webm)$/, '_temp.$1');
-          await fs.move(outputPath, tempVideoPath);
-          await this.ffmpeg.addAudioToVideo(tempVideoPath, firstAudio.path, outputPath, {
-            audioStartTime: firstAudio.startTime || 0,
-          });
-          await fs.remove(tempVideoPath);
-        }
       }
 
       // 清理临时文件
