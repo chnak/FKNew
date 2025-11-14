@@ -70,6 +70,15 @@ export const DEFAULT_TEXT_CONFIG = {
   // Shadow Style（阴影样式）
   textShadowStyle: 'outer', // 阴影样式: 'outer'（外阴影）, 'inner'（内阴影）
   textShadowSpread: 0, // 阴影扩散（类似 CSS box-shadow 的 spread）
+  // 文本渐变效果
+  gradient: false, // 是否启用渐变
+  gradientColors: ['#FF6B6B', '#4ECDC4'], // 渐变颜色数组
+  gradientDirection: 'horizontal', // 渐变方向: 'horizontal'（水平）, 'vertical'（垂直）, 'diagonal'（对角线）
+  // 文本发光效果
+  textGlow: false, // 是否启用发光
+  textGlowColor: '#FFFFFF', // 发光颜色
+  textGlowBlur: 20, // 发光模糊半径
+  textGlowIntensity: 1, // 发光强度 (0-1)
 };
 
 /**

@@ -129,17 +129,17 @@ export const PRESET_ANIMATIONS = {
 
   bigIn: {
     type: 'transform',
-    from: { scaleX: 0, scaleY: 0 },
-    to: { scaleX: 1, scaleY: 1 },
-    duration: 1,
+    from: { scaleX: 2, scaleY: 2, opacity: 0 },
+    to: { scaleX: 1, scaleY: 1, opacity: 1 },
+    duration: 0.6,
     delay: 0,
     easing: 'ease-out-back',
   },
   bigOut: {
     type: 'transform',
-    from: { scaleX: 1, scaleY: 1 },
-    to: { scaleX: 0, scaleY: 0 },
-    duration: 1,
+    from: { scaleX: 1, scaleY: 1, opacity: 1 },
+    to: { scaleX: 2, scaleY: 2, opacity: 0 },
+    duration: 0.6,
     delay: -1,
     easing: 'ease-in-back',
   },

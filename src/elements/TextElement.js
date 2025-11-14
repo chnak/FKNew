@@ -362,9 +362,8 @@ export class TextElement extends BaseElement {
     pointText.fontFamily = fontFamily;
     pointText.fontWeight = fontWeight;
     pointText.fontStyle = fontStyle;
-    pointText.fillColor = state.color || '#000000';
-
-    // 设置文本对齐
+    
+    // 设置文本对齐（需要在获取边界之前设置）
     const textAlign = state.textAlign || 'center';
     if (textAlign === 'center') {
       pointText.justification = 'center';
@@ -382,6 +381,48 @@ export class TextElement extends BaseElement {
       pointText.baseline = 'bottom';
     } else {
       pointText.baseline = 'top';
+    }
+    
+    // 应用渐变或普通颜色
+    if (state.gradient && state.gradientColors && Array.isArray(state.gradientColors) && state.gradientColors.length >= 2) {
+      // 先设置一个临时颜色来获取文本边界框
+      pointText.fillColor = state.color || '#000000';
+      
+      // 获取文本边界框来确定渐变范围
+      const bounds = pointText.bounds;
+      
+      // 创建渐变
+      const gradient = new paper.Gradient();
+      const stops = state.gradientColors.map((color, index) => {
+        const stop = new paper.GradientStop();
+        stop.color = new paper.Color(color);
+        stop.rampPoint = index / (state.gradientColors.length - 1);
+        return stop;
+      });
+      gradient.stops = stops;
+      
+      // 根据渐变方向设置渐变起点和终点
+      const gradientDirection = state.gradientDirection || 'horizontal';
+      let startPoint, endPoint;
+      
+      if (gradientDirection === 'vertical') {
+        startPoint = new paper.Point(bounds.x, bounds.y);
+        endPoint = new paper.Point(bounds.x, bounds.y + bounds.height);
+      } else if (gradientDirection === 'diagonal') {
+        startPoint = new paper.Point(bounds.x, bounds.y);
+        endPoint = new paper.Point(bounds.x + bounds.width, bounds.y + bounds.height);
+      } else {
+        // horizontal (default)
+        startPoint = new paper.Point(bounds.x, bounds.y);
+        endPoint = new paper.Point(bounds.x + bounds.width, bounds.y);
+      }
+      
+      // 创建线性渐变颜色
+      const gradientColor = new paper.Color(gradient, startPoint, endPoint);
+      pointText.fillColor = gradientColor;
+    } else {
+      // 使用普通颜色
+      pointText.fillColor = state.color || '#000000';
     }
 
     // 使用统一的变换方法应用动画
@@ -423,8 +464,25 @@ export class TextElement extends BaseElement {
       }
     }
 
+    // 应用文本发光效果（使用多层阴影模拟）
+    if (state.textGlow) {
+      const glowColor = state.textGlowColor || '#FFFFFF';
+      const glowBlur = state.textGlowBlur || 20;
+      const glowIntensity = state.textGlowIntensity || 1;
+      
+      // 创建发光效果：使用多层阴影叠加
+      // Paper.js 的 shadowBlur 和 shadowColor 可以创建发光效果
+      // 为了增强发光效果，我们可以使用较大的模糊半径和较小的偏移
+      pointText.shadowColor = new paper.Color(glowColor);
+      pointText.shadowColor.alpha = Math.min(glowIntensity, 1);
+      pointText.shadowBlur = glowBlur;
+      pointText.shadowOffset = new paper.Point(0, 0); // 发光效果通常不需要偏移
+    }
+    
     // 应用文本阴影效果（使用 Paper.js 原生属性）
-    if (state.textShadow) {
+    // 注意：如果同时设置了发光和阴影，阴影会覆盖发光，所以发光应该在阴影之前设置
+    // 但为了更好的效果，我们优先使用阴影（如果设置了阴影）
+    if (state.textShadow && !state.textGlow) {
       const shadowColor = state.textShadowColor || '#000000';
       const shadowBlur = state.textShadowBlur || 0;
       const shadowOffsetX = state.textShadowOffsetX || 2;
