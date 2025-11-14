@@ -32,6 +32,7 @@ export class VideoExporter {
       format = this.config.format,
       audioPath,
       startTime = 0,
+      usePipe=true,
       endTime = composition.timeline.duration,
     } = options;
 
@@ -39,8 +40,7 @@ export class VideoExporter {
     const outputDir = path.dirname(outputPath);
     await fs.ensureDir(outputDir);
 
-      // 不再需要临时目录，直接使用管道
-      const usePipe = options.usePipe !== false; // 默认使用管道模式
+
 
       try {
         // 记录渲染开始时间
