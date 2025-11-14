@@ -49,6 +49,7 @@ export const DEFAULT_TEXT_CONFIG = {
   textAlign: 'center',
   textBaseline: 'middle',
   lineHeight: 1.2,
+  // 描边效果
   stroke: false, // 是否启用描边
   strokeColor: '#000000', // 描边颜色
   strokeWidth: 2, // 描边宽度
