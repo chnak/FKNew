@@ -3,6 +3,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import { Renderer } from './Renderer.js';
 import { TransitionElement } from '../elements/TransitionElement.js';
+import { TransitionRenderer } from '../utils/transition-renderer.js';
+import { createCanvas } from 'canvas';
 
 /**
  * 视频导出器
@@ -321,16 +323,45 @@ export class VideoExporter {
     // 启动 FFmpeg 管道进程
     const pipe = await this.ffmpeg.imagesToVideoPipe(outputPath, ffmpegOptions);
     
+    // 初始化转场渲染器（如果有转场）
+    const transitions = composition.transitions || [];
+    const transitionRenderers = new Map();
+    
+    // 调试信息：打印转场信息
+    if (transitions.length > 0) {
+      console.log(`检测到 ${transitions.length} 个转场:`);
+      transitions.forEach((t, i) => {
+        console.log(`  转场 ${i + 1}: ${t.name}, 时间范围: ${t.startTime.toFixed(3)}s - ${t.endTime.toFixed(3)}s, 时长: ${t.duration.toFixed(3)}s`);
+      });
+    } else {
+      console.log('未检测到转场');
+    }
+    
     try {
       for (let frame = 0; frame < totalFrames; frame++) {
         try {
           const time = startTime + frame / fps;
 
-          // 渲染帧（传入背景色）
-          await this.renderer.renderFrame(composition.timeline.getLayers(), time, backgroundColor);
-
-          // 获取 PNG buffer
-          const buffer = this.renderer.getCanvasBuffer();
+          // 检查是否有转场
+          const activeTransition = transitions.find(t => 
+            time >= t.startTime && time < t.endTime
+          );
+          
+          let buffer;
+          if (activeTransition) {
+            // 有转场，渲染转场效果
+            buffer = await this.renderFrameWithTransition(
+              composition, 
+              time, 
+              activeTransition, 
+              backgroundColor,
+              transitionRenderers
+            );
+          } else {
+            // 正常渲染帧（转场期间或转场结束后）
+            await this.renderer.renderFrame(composition.timeline.getLayers(), time, backgroundColor);
+            buffer = this.renderer.getCanvasBuffer();
+          }
           
           // 直接写入 FFmpeg 管道
           await pipe.writeFrame(buffer);
@@ -363,6 +394,177 @@ export class VideoExporter {
       }
       throw error;
     }
+  }
+
+  /**
+   * 渲染带转场效果的帧
+   * @param {VideoMaker} composition - 合成对象
+   * @param {number} time - 当前时间
+   * @param {Object} transition - 转场配置
+   * @param {string} backgroundColor - 背景色
+   * @param {Map} transitionRenderers - 转场渲染器缓存
+   * @returns {Promise<Buffer>} PNG buffer
+   */
+  async renderFrameWithTransition(composition, time, transition, backgroundColor, transitionRenderers) {
+    // 计算转场进度（0-1）
+    // 转场时间范围：transition.startTime 到 transition.endTime
+    // 转场实际时长：transition.endTime - transition.startTime
+    const actualDuration = transition.endTime - transition.startTime;
+    const progress = Math.max(0, Math.min(1, (time - transition.startTime) / actualDuration));
+    
+    
+    // 获取或创建转场渲染器
+    const rendererKey = `${transition.name}_${transition.easing || 'linear'}`;
+    let transitionRenderer = transitionRenderers.get(rendererKey);
+    if (!transitionRenderer) {
+      transitionRenderer = new TransitionRenderer({
+        name: transition.name,
+        easing: transition.easing,
+        params: transition.params,
+      });
+      transitionRenderers.set(rendererKey, transitionRenderer);
+    }
+    
+    // 创建转场函数
+    const transitionFunction = transitionRenderer.create({
+      width: composition.width,
+      height: composition.height,
+      channels: 4,
+    });
+    
+    // 渲染 from 场景的最后一帧
+    const fromScene = transition.fromScene;
+    const fromBackgroundColor = fromScene.backgroundLayer?.config?.backgroundColor || backgroundColor;
+    
+    // 为from场景创建临时composition
+    const { VideoMaker } = await import('../core/VideoMaker.js');
+    const fromComposition = new VideoMaker({
+      width: composition.width,
+      height: composition.height,
+      fps: composition.fps,
+      duration: fromScene.duration,
+      backgroundColor: fromBackgroundColor,
+    });
+    // 构建from场景的元素（相对于场景开始时间0）
+    const fromSceneElements = fromScene.build(0);
+    const fromLayer = fromComposition.createElementLayer({ zIndex: 1 });
+    for (const element of fromSceneElements) {
+      if (element.type !== 'audio') {
+        // 克隆元素，避免修改原始元素
+        const clonedElement = Object.assign(Object.create(Object.getPrototypeOf(element)), element);
+        // 调整元素时间，使其在场景结束时显示
+        // 元素的时间是相对于场景的，所以需要调整
+        const elementRelativeTime = clonedElement.startTime || 0;
+        // 如果元素在场景结束时还在显示，调整时间使其在转场期间显示
+        if (elementRelativeTime < fromScene.duration) {
+          // 元素在场景结束前，确保元素在场景结束时仍然显示
+          // 不需要调整startTime，只需要确保endTime足够长
+          if (clonedElement.duration !== undefined) {
+            // 如果元素有duration，确保它在场景结束时仍然显示
+            const elementEndTime = elementRelativeTime + clonedElement.duration;
+            if (elementEndTime < fromScene.duration) {
+              // 元素在场景结束前就结束了，延长它的显示时间
+              clonedElement.endTime = fromScene.duration;
+            }
+          } else {
+            // 元素没有duration，使用场景的持续时间
+            clonedElement.endTime = fromScene.duration;
+          }
+        }
+        clonedElement.canvasWidth = composition.width;
+        clonedElement.canvasHeight = composition.height;
+        fromLayer.addElement(clonedElement);
+      }
+    }
+    
+    const fromRenderer = new Renderer({
+      width: composition.width,
+      height: composition.height,
+      fps: composition.fps,
+    });
+    await fromRenderer.init();
+    // 渲染场景的最后一帧（场景结束时的状态）
+    // 使用场景的持续时间来渲染场景结束时的状态
+    await fromRenderer.renderFrame(fromComposition.timeline.getLayers(), fromScene.duration, fromBackgroundColor);
+    // 从Canvas获取RGBA Buffer
+    const fromCanvas = fromRenderer.canvas;
+    const fromCtx = fromCanvas.getContext('2d');
+    const fromImageData = fromCtx.getImageData(0, 0, fromCanvas.width, fromCanvas.height);
+    const fromBuffer = Buffer.from(fromImageData.data);
+    fromRenderer.destroy();
+    fromComposition.destroy();
+    
+    // 渲染 to 场景的第一帧
+    const toScene = transition.toScene;
+    const toBackgroundColor = toScene.backgroundLayer?.config?.backgroundColor || backgroundColor;
+    
+    // 为to场景创建临时composition
+    const toComposition = new VideoMaker({
+      width: composition.width,
+      height: composition.height,
+      fps: composition.fps,
+      duration: toScene.duration,
+      backgroundColor: toBackgroundColor,
+    });
+    // 构建to场景的元素（相对于场景开始时间0）
+    const toSceneElements = toScene.build(0);
+    const toLayer = toComposition.createElementLayer({ zIndex: 1 });
+    for (const element of toSceneElements) {
+      if (element.type !== 'audio') {
+        // 克隆元素，避免修改原始元素
+        const clonedElement = Object.assign(Object.create(Object.getPrototypeOf(element)), element);
+        // 元素的时间已经是相对于场景的（因为build(0)）
+        // 确保元素在时间0时是激活的
+        // 元素的时间是相对于场景的，所以startTime应该是0或更小
+        if (clonedElement.startTime === undefined || clonedElement.startTime > 0) {
+          clonedElement.startTime = 0;
+        }
+        // 确保endTime正确设置
+        if (clonedElement.duration !== undefined) {
+          clonedElement.endTime = clonedElement.startTime + clonedElement.duration;
+        } else if (clonedElement.endTime === Infinity || clonedElement.endTime === undefined) {
+          clonedElement.endTime = toScene.duration;
+        }
+        clonedElement.canvasWidth = composition.width;
+        clonedElement.canvasHeight = composition.height;
+        toLayer.addElement(clonedElement);
+      }
+    }
+    
+    const toRenderer = new Renderer({
+      width: composition.width,
+      height: composition.height,
+      fps: composition.fps,
+    });
+    await toRenderer.init();
+    // 渲染场景的第一帧（场景开始时的状态）
+    // 使用时间0来渲染场景开始时的状态
+    await toRenderer.renderFrame(toComposition.timeline.getLayers(), 0, toBackgroundColor);
+    
+    // 从Canvas获取RGBA Buffer
+    const toCanvas = toRenderer.canvas;
+    const toCtx = toCanvas.getContext('2d');
+    const toImageData = toCtx.getImageData(0, 0, toCanvas.width, toCanvas.height);
+    const toBuffer = Buffer.from(toImageData.data);
+    toRenderer.destroy();
+    toComposition.destroy();
+    
+    // 使用转场函数混合两个场景
+    const resultBuffer = transitionFunction({
+      fromFrame: fromBuffer,
+      toFrame: toBuffer,
+      progress: progress,
+    });
+    
+    // 将 Buffer 转换为 Canvas，然后转换为 PNG buffer
+    const resultCanvas = createCanvas(composition.width, composition.height);
+    const ctx = resultCanvas.getContext('2d');
+    const imageData = ctx.createImageData(composition.width, composition.height);
+    imageData.data.set(resultBuffer);
+    ctx.putImageData(imageData, 0, 0);
+    
+    // 转换为 PNG buffer
+    return resultCanvas.toBuffer('image/png');
   }
 
   /**
