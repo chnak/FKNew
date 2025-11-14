@@ -1,4 +1,4 @@
-import { BaseElement } from './BaseElement.js';
+import { BaseElement, normalizeAnimationConfig } from './BaseElement.js';
 import { TextElement } from './TextElement.js';
 import { ElementType } from '../types/enums.js';
 import { parseSubtitles, calculateMixedTextCapacity } from '../utils/subtitle-utils.js';
@@ -99,38 +99,9 @@ export class SubtitleElement extends BaseElement {
         split: this.split,
         splitDelay: this.splitDelay,
         splitDuration: this.splitDuration,
-        // 动画配置
+        // 动画配置（使用统一的动画配置规范化函数）
         animations: this.originalAnimations && Array.isArray(this.originalAnimations) 
-          ? this.originalAnimations.map(anim => {
-              // 如果是动画实例，提取其配置；如果是配置对象，直接使用
-              if (anim && typeof anim.getStateAtTime === 'function') {
-                // 这是动画实例，需要提取配置
-                const animConfig = {};
-                if (anim.type) animConfig.type = anim.type;
-                if (anim.duration !== undefined) animConfig.duration = anim.duration;
-                if (anim.delay !== undefined) animConfig.delay = anim.delay;
-                if (anim.startTime !== undefined) animConfig.startTime = anim.startTime;
-                if (anim.easing) animConfig.easing = anim.easing;
-                if (anim.property) animConfig.property = anim.property;
-                if (anim.from !== undefined) animConfig.from = anim.from;
-                if (anim.to !== undefined) animConfig.to = anim.to;
-                return animConfig;
-              } else {
-                // 这是配置对象，直接深拷贝（只拷贝基本类型）
-                const animConfig = {};
-                for (const key in anim) {
-                  if (anim.hasOwnProperty(key) && typeof anim[key] !== 'object') {
-                    animConfig[key] = anim[key];
-                  } else if (anim.hasOwnProperty(key) && Array.isArray(anim[key])) {
-                    animConfig[key] = [...anim[key]];
-                  } else if (anim.hasOwnProperty(key) && anim[key] !== null && typeof anim[key] === 'object' && !anim[key].target) {
-                    // 只拷贝非循环引用的对象
-                    animConfig[key] = { ...anim[key] };
-                  }
-                }
-                return animConfig;
-              }
-            })
+          ? this.originalAnimations.map(anim => normalizeAnimationConfig(anim))
           : [],
         // 其他配置
         opacity: this.config.opacity !== undefined ? this.config.opacity : 1,
