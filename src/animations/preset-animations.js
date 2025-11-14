@@ -1,5 +1,3 @@
-import { FadeAnimation } from './FadeAnimation.js';
-import { MoveAnimation } from './MoveAnimation.js';
 import { TransformAnimation } from './TransformAnimation.js';
 
 /**

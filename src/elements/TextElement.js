@@ -1,11 +1,10 @@
-import { BaseElement } from './BaseElement.js';
+import { BaseElement, normalizeAnimationConfig } from './BaseElement.js';
 import { DEFAULT_TEXT_CONFIG } from '../types/constants.js';
 import { deepMerge } from '../utils/helpers.js';
 import { ElementType } from '../types/enums.js';
 import { toFontSizePixels, toPixels } from '../utils/unit-converter.js';
 import { getDefaultFontFamily, isFontRegistered } from '../utils/font-manager.js';
 import { TextSplitter } from '../utils/text-splitter.js';
-import { FadeAnimation } from '../animations/FadeAnimation.js';
 import paper from 'paper-jsdom-canvas';
 
 /**
@@ -39,6 +38,8 @@ export class TextElement extends BaseElement {
     }
   }
   
+
+
   /**
    * 初始化文本分割器
    */
@@ -119,52 +120,12 @@ export class TextElement extends BaseElement {
         // 注意：不要在这里设置 opacity: 0，因为这会覆盖动画的初始状态
         // opacity 应该由动画来控制
         // 继承父元素的动画配置，但会应用到每个片段
-        // 注意：动画的 startTime 是相对于子元素的 startTime 的，所以不需要调整
-        // 使用 originalAnimations（原始配置数组），而不是动画实例
-        animations: this.originalAnimations && Array.isArray(this.originalAnimations) ? this.originalAnimations.map(anim => {
-          // 如果是字符串（预设动画名称），直接返回
-          if (typeof anim === 'string') {
-            return anim;
-          }
-          // 如果是动画实例，提取其配置；如果是配置对象，直接使用
-          if (anim && typeof anim.getStateAtTime === 'function') {
-            // 这是动画实例，需要提取配置
-            // 从动画实例中提取配置信息（避免循环引用）
-            const animConfig = {};
-            if (anim.type) animConfig.type = anim.type;
-            if (anim.duration !== undefined) animConfig.duration = anim.duration;
-            if (anim.delay !== undefined) animConfig.delay = anim.delay;
-            if (anim.startTime !== undefined) animConfig.startTime = anim.startTime;
-            if (anim.easing) animConfig.easing = anim.easing;
-            if (anim.property) animConfig.property = anim.property;
-            if (anim.from !== undefined) animConfig.from = anim.from;
-            if (anim.to !== undefined) animConfig.to = anim.to;
-            if (anim.fromOpacity !== undefined) animConfig.fromOpacity = anim.fromOpacity;
-            if (anim.toOpacity !== undefined) animConfig.toOpacity = anim.toOpacity;
-            return animConfig;
-          } else {
-            // 这是配置对象，直接深拷贝（只拷贝基本类型和数组）
-            // 注意：需要确保所有属性都被正确拷贝，包括 duration, delay 等
-            const animConfig = {};
-            for (const key in anim) {
-              if (anim.hasOwnProperty(key)) {
-                const value = anim[key];
-                // 拷贝基本类型（number, string, boolean, null, undefined）
-                if (value === null || value === undefined || 
-                    typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
-                  animConfig[key] = value;
-                } else if (Array.isArray(value)) {
-                  // 拷贝数组
-                  animConfig[key] = [...value];
-                } else if (typeof value === 'object' && !value.target) {
-                  // 只拷贝非循环引用的对象（避免拷贝 target 等循环引用）
-                  animConfig[key] = { ...value };
-                }
-              }
-            }
-            return animConfig;
-          }
-        }) : [],
+        // 参考 FKVideo 的实现：不调整动画的 delay，而是调整计算动画时使用的时间
+        // 这样每个片段的动画会相对于自己的延迟时间来计算，实现逐字动画效果
+        // 使用统一的动画配置规范化函数（从 BaseElement 导入）
+        animations: this.originalAnimations && Array.isArray(this.originalAnimations) 
+          ? this.originalAnimations.map(anim => normalizeAnimationConfig(anim))
+          : [],
       };
       
       // 创建子 TextElement
@@ -185,94 +146,19 @@ export class TextElement extends BaseElement {
       //     })));
       // }
       
-      // 分割文本初始透明度为 0，动画开始时才设置为 1
-      // 检查是否有淡入动画（fadeIn），如果没有则添加一个默认的淡入动画
-      // 检查原始动画配置和已创建的动画实例
-      const hasFadeInAnimation = (() => {
-        // 检查已创建的动画实例
-        if (segmentElement.animations && segmentElement.animations.length > 0) {
-          const hasFadeIn = segmentElement.animations.some(anim => {
-            if (anim && typeof anim.getStateAtTime === 'function') {
-              // 这是动画实例
-              return anim.type === 'fade' && anim.fromOpacity === 0;
-            }
-            return false;
-          });
-          if (hasFadeIn) return true;
-        }
-        
-        // 检查原始动画配置
-        if (this.originalAnimations && Array.isArray(this.originalAnimations)) {
-          const hasFadeInConfig = this.originalAnimations.some(anim => {
-            // 如果是字符串，检查是否是淡入相关的预设动画
-            if (typeof anim === 'string') {
-              const lowerAnim = anim.toLowerCase();
-              return lowerAnim === 'fadein' || lowerAnim === 'fade-in' || lowerAnim.includes('fadein');
-            }
-            if (anim && typeof anim === 'object') {
-              // 检查配置对象
-              const animType = anim.type || anim.animationType;
-              // 检查是否是淡入动画：type 为 'fade' 或 'fadeIn'，或者 fromOpacity 为 0
-              if (animType === 'fade' || animType === 'fadeIn') {
-                // 如果是 fade 类型，检查 fromOpacity 是否为 0 或未定义（默认从 0 开始）
-                if (anim.fromOpacity === 0 || anim.fromOpacity === undefined || anim.from === 0) {
-                  return true;
-                }
-              }
-              // 直接检查 fromOpacity 或 from 是否为 0
-              if (anim.fromOpacity === 0 || anim.from === 0) {
-                return true;
-              }
-            }
-            return false;
-          });
-          if (hasFadeInConfig) return true;
-        }
-        
-        return false;
-      })();
-      
-      // 检查是否有 transform 类型的动画（如 bigIn, zoomIn 等）
-      const hasTransformAnimation = (() => {
-        if (this.originalAnimations && Array.isArray(this.originalAnimations)) {
-          return this.originalAnimations.some(anim => {
-            if (typeof anim === 'string') {
-              // 检查是否是 transform 相关的预设动画
-              const lowerAnim = anim.toLowerCase();
-              return lowerAnim.includes('in') || lowerAnim.includes('out') || 
-                     lowerAnim.includes('zoom') || lowerAnim.includes('big') ||
-                     lowerAnim.includes('rotate') || lowerAnim.includes('bounce');
-            }
-            if (anim && typeof anim === 'object') {
-              const animType = anim.type || anim.animationType;
-              return animType === 'transform' || animType === 'move' || animType === 'keyframe';
-            }
-            return false;
-          });
-        }
-        return false;
-      })();
-      
-      // 如果没有淡入动画，且用户没有指定任何动画，才添加一个默认的淡入动画（从 0 到 1）
-      // 如果用户指定了 transform 动画但没有淡入动画，确保初始透明度为 1，这样 transform 动画才能正常显示
+      // 如果用户没有指定任何动画，为分割片段添加默认淡入动画
       const hasAnyAnimation = this.originalAnimations && Array.isArray(this.originalAnimations) && this.originalAnimations.length > 0;
       
-      if (!hasFadeInAnimation && !hasAnyAnimation) {
-        // 用户没有指定任何动画，添加默认淡入
-        const defaultFadeIn = new FadeAnimation({
+      if (!hasAnyAnimation) {
+        // 使用预设动画配置，添加默认淡入动画
+        segmentElement.addAnimation({
+          type: 'fade',
           fromOpacity: 0,
           toOpacity: 1,
           duration: this.splitDuration || 0.3,
           startTime: 0,
           easing: 'easeOut',
         });
-        segmentElement.addAnimation(defaultFadeIn);
-      } else if (hasTransformAnimation && !hasFadeInAnimation) {
-        // 用户指定了 transform 动画但没有淡入动画，确保初始透明度为 1
-        // 这样 transform 动画才能正常显示
-        if (segmentElement.config.opacity === undefined || segmentElement.config.opacity === 0) {
-          segmentElement.config.opacity = 1;
-        }
       }
       
       // 不预先应用动画的初始状态，让动画在开始时才应用
@@ -330,8 +216,12 @@ export class TextElement extends BaseElement {
     // 如果启用了分割，渲染所有子片段
     if (this.split && this.segments.length > 0) {
       // 渲染所有子片段
+      // 参考 FKVideo 的实现：对于分割文本，每个片段有自己的 segmentDelay
+      // 动画的 delay 不需要调整，而是调整计算动画时使用的时间
+      // 注意：时间调整在子片段的 render 方法中进行，这里直接传递原始时间
       for (const segment of this.segments) {
         if (segment && typeof segment.render === 'function') {
+          // 直接传递原始时间，子片段会在自己的 render 方法中调整时间
           segment.render(layer, time);
         }
       }
@@ -352,6 +242,9 @@ export class TextElement extends BaseElement {
       baseFontSize: 16 
     };
     
+    // 对于分割片段，不需要调整时间
+    // 退出动画的错开效果已经在 BaseElement.getStateAtTime 中通过调整 effectiveEndTime 实现
+    // 进入动画的错开效果通过每个片段的 startTime 不同自然实现
     const state = this.getStateAtTime(time, context);
 
     // 转换字体大小单位

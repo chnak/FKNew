@@ -11,6 +11,73 @@ import { getPresetAnimation } from '../animations/preset-animations.js';
 import paper from 'paper-jsdom-canvas';
 
 /**
+ * 规范化动画配置为统一格式
+ * 将动画实例或配置对象转换为纯配置对象，便于序列化和传递
+ * @param {string|Object|Animation} animConfig - 动画配置（字符串、对象或动画实例）
+ * @returns {string|Object} 规范化后的动画配置（字符串或配置对象）
+ */
+export function normalizeAnimationConfig(animConfig) {
+  // 如果是字符串（预设动画名称），直接返回
+  if (typeof animConfig === 'string') {
+    return animConfig;
+  }
+
+  // 如果是动画实例，提取其配置信息（避免循环引用）
+  if (animConfig && typeof animConfig.getStateAtTime === 'function') {
+    const config = {};
+    // 提取所有可序列化的属性
+    if (animConfig.type) config.type = animConfig.type;
+    if (animConfig.duration !== undefined) config.duration = animConfig.duration;
+    if (animConfig.delay !== undefined) config.delay = animConfig.delay;
+    if (animConfig.startTime !== undefined) config.startTime = animConfig.startTime;
+    if (animConfig.easing) config.easing = animConfig.easing;
+    if (animConfig.property) config.property = animConfig.property;
+    if (animConfig.from !== undefined) config.from = animConfig.from;
+    if (animConfig.to !== undefined) config.to = animConfig.to;
+    if (animConfig.fromOpacity !== undefined) config.fromOpacity = animConfig.fromOpacity;
+    if (animConfig.toOpacity !== undefined) config.toOpacity = animConfig.toOpacity;
+    if (animConfig.fromX !== undefined) config.fromX = animConfig.fromX;
+    if (animConfig.toX !== undefined) config.toX = animConfig.toX;
+    if (animConfig.fromY !== undefined) config.fromY = animConfig.fromY;
+    if (animConfig.toY !== undefined) config.toY = animConfig.toY;
+    if (animConfig.fromScaleX !== undefined) config.fromScaleX = animConfig.fromScaleX;
+    if (animConfig.toScaleX !== undefined) config.toScaleX = animConfig.toScaleX;
+    if (animConfig.fromScaleY !== undefined) config.fromScaleY = animConfig.fromScaleY;
+    if (animConfig.toScaleY !== undefined) config.toScaleY = animConfig.toScaleY;
+    if (animConfig.fromRotation !== undefined) config.fromRotation = animConfig.fromRotation;
+    if (animConfig.toRotation !== undefined) config.toRotation = animConfig.toRotation;
+    if (animConfig.keyframes) config.keyframes = animConfig.keyframes;
+    return config;
+  }
+
+  // 如果是配置对象，深拷贝基本类型属性（避免循环引用）
+  if (animConfig && typeof animConfig === 'object') {
+    const config = {};
+    for (const key in animConfig) {
+      if (animConfig.hasOwnProperty(key)) {
+        const value = animConfig[key];
+        // 跳过循环引用（如 target）
+        if (key === 'target') continue;
+        // 拷贝基本类型
+        if (value === null || value === undefined || 
+            typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') {
+          config[key] = value;
+        } else if (Array.isArray(value)) {
+          // 拷贝数组
+          config[key] = [...value];
+        } else if (typeof value === 'object' && !value.getStateAtTime) {
+          // 拷贝普通对象（排除动画实例）
+          config[key] = { ...value };
+        }
+      }
+    }
+    return config;
+  }
+
+  return animConfig;
+}
+
+/**
  * 根据动画配置创建动画实例
  * 支持字符串形式的预设动画名称，如 "fadeIn", "fadeOut"
  * 也支持对象形式的配置，如 {type: "fadeIn", duration: 1, delay: 2}
@@ -21,18 +88,18 @@ function createAnimationFromConfig(animConfig) {
     return animConfig;
   }
 
-  // 如果是字符串，尝试获取预设动画
-  if (typeof animConfig === 'string') {
-    const preset = getPresetAnimation(animConfig);
-    if (preset) {
-      // 使用预设动画的默认配置
-      return createAnimationFromConfig(preset);
-    } else {
-      console.warn(`未找到预设动画: ${animConfig}`);
-      // 如果找不到预设，返回一个默认的淡入动画
-      return new FadeAnimation({ fromOpacity: 0, toOpacity: 1 });
-    }
-  }
+      // 如果是字符串，尝试获取预设动画
+      if (typeof animConfig === 'string') {
+        const preset = getPresetAnimation(animConfig);
+        if (preset) {
+          // 使用预设动画的默认配置
+          return createAnimationFromConfig(preset);
+        } else {
+          console.warn(`未找到预设动画: ${animConfig}，使用默认 fadeIn`);
+          // 如果找不到预设，使用默认的淡入动画预设
+          return createAnimationFromConfig('fadeIn');
+        }
+      }
 
   // 如果是对象，检查是否有预设动画名称
   if (animConfig && typeof animConfig === 'object') {
@@ -71,8 +138,8 @@ function createAnimationFromConfig(animConfig) {
     case 'keyframe':
       return new KeyframeAnimation(config);
     default:
-      // 默认使用 FadeAnimation
-      return new FadeAnimation(config);
+      // 默认使用淡入动画预设
+      return createAnimationFromConfig({ type: 'fade', fromOpacity: 0, toOpacity: 1, ...config });
   }
 }
 
@@ -273,7 +340,22 @@ export class BaseElement {
     // 按开始时间排序动画，确保先应用先开始的动画
     const sortedAnimations = [...this.animations].map(anim => {
       const delay = anim.config.delay !== undefined ? anim.config.delay : 0;
-      const startTime = delay < 0 ? this.endTime + delay : this.startTime + delay;
+      // 对于负 delay 的动画，从元素的结束时间往前计算
+      let effectiveEndTime = this.endTime;
+      
+      // 对于分割片段，需要调整 endTime 使退出动画按 splitDelay 错开
+      // 这样每个片段的退出动画会提前 segmentDelay 开始
+      if (delay < 0 && this.isSegment && this.parentElement) {
+        const segmentDelay = this.startTime - this.parentElement.startTime;
+        // 调整 endTime，使每个片段的退出动画提前 segmentDelay 开始
+        // 例如：父元素 endTime=5, delay=-1，动画开始时间=4
+        // 片段0（segmentDelay=0）：effectiveEndTime=5，动画开始时间=4
+        // 片段1（segmentDelay=0.1）：effectiveEndTime=4.9，动画开始时间=3.9
+        // 片段2（segmentDelay=0.2）：effectiveEndTime=4.8，动画开始时间=3.8
+        effectiveEndTime = this.endTime - segmentDelay;
+      }
+      
+      const startTime = delay < 0 ? effectiveEndTime + delay : this.startTime + delay;
       return { animation: anim, startTime, delay };
     }).sort((a, b) => a.startTime - b.startTime);
     

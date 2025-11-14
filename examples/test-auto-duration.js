@@ -63,8 +63,8 @@ async function testAutoDuration() {
       startTime: 0,
       zIndex: 10, // 提高 zIndex，确保文本在示波器上方
       split: 'letter',
-    //   splitDelay: 0.05, // 字母出现延迟
-    //   splitDuration: 0.3, // 字母动画时长
+      splitDelay: 0.05, // 字母出现延迟
+      splitDuration: 0.3, // 字母动画时长
       animations: [
         { type: 'fade', fromOpacity: 0, toOpacity: 1, duration: 0.3 },
         { type: 'fade', fromOpacity: 1, toOpacity: 0, duration: 0.3, delay: audioDurationNum - 0.3 },
