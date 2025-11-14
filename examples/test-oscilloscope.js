@@ -1,4 +1,4 @@
-import { VideoBuilder } from '../src/index.js';
+import { VideoBuilder,getAudioDuration } from '../src/index.js';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,10 +13,18 @@ async function testOscilloscope() {
   console.log('=== 测试示波器元素 ===\n');
   
   // 检查音频文件是否存在
-  const audioFile = path.join(__dirname, '../assets/帝女芳魂.mp3');
+  const audioFile = path.join(__dirname, '../assets/1.mp3');
   if (!await fs.pathExists(audioFile)) {
     console.error(`音频文件不存在: ${audioFile}`);
     console.log('请确保 assets 目录下有音频文件');
+    return;
+  }
+
+  const audioDuration = await getAudioDuration(audioFile);
+  const audioDurationNum = Number(audioDuration) || 0;
+  
+  if (audioDurationNum <= 0) {
+    console.error('无法获取音频时长');
     return;
   }
 
@@ -29,7 +37,7 @@ async function testOscilloscope() {
   const track = builder.createTrack({ zIndex: 1 });
   
   // 创建场景并添加示波器
-  const scene = track.createScene({ duration: 10 })
+  const scene = track.createScene({ duration: audioDurationNum })
     .addBackground({ color: '#1a1a1a' })
     .addText({
       text: "音频示波器演示",
@@ -38,7 +46,7 @@ async function testOscilloscope() {
       x: "50%",
       y: "15%",
       textAlign: "center",
-      duration: 10,
+      duration: audioDurationNum,
       startTime: 0,
       zIndex: 2,
     });
@@ -47,7 +55,7 @@ async function testOscilloscope() {
   await scene.addOscilloscope({
     audioPath: audioFile,
     x: '50%',
-    y: '40%',
+    y: '25%',
     width: 1600,
     height: 200,
     waveColor: '#00ff00',
@@ -59,7 +67,7 @@ async function testOscilloscope() {
     sensitivity: 1.0,
     windowSize: 0.1, // 显示窗口 0.1 秒
     startTime: 0,
-    duration: 10,
+    duration:audioDurationNum,
     zIndex: 1,
   });
 
@@ -67,7 +75,7 @@ async function testOscilloscope() {
   await scene.addOscilloscope({
     audioPath: audioFile,
     x: '50%',
-    y: '65%',
+    y: '45%',
     width: 1600,
     height: 200,
     waveColor: '#00ffff',
@@ -79,7 +87,7 @@ async function testOscilloscope() {
     sensitivity: 1.2,
     windowSize: 0.1,
     startTime: 0,
-    duration: 10,
+    duration: audioDurationNum,
     zIndex: 1,
   });
 
@@ -87,7 +95,7 @@ async function testOscilloscope() {
   await scene.addOscilloscope({
     audioPath: audioFile,
     x: '50%',
-    y: '90%',
+    y: '70%',
     width: 400,
     height: 400,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -105,7 +113,7 @@ async function testOscilloscope() {
     particleTrail: true,
     windowSize: 0.1,
     startTime: 0,
-    duration: 10,
+    duration:audioDurationNum,
     zIndex: 1,
   });
 
@@ -113,7 +121,7 @@ async function testOscilloscope() {
   scene.addAudio({
     src: audioFile,
     startTime: 0,
-    duration: 10,
+    duration: audioDurationNum,
     volume: 0.8,
   });
   
@@ -121,11 +129,11 @@ async function testOscilloscope() {
   const outputDir = path.join(__dirname, '../output');
   await fs.ensureDir(outputDir);
   
-  const outputPath = path.join(outputDir, 'test-oscilloscope.mp4');
+  const outputPath = path.join(outputDir, 'test-oscilloscope11.mp4');
   
   console.log('开始渲染视频...');
   const startTime = Date.now();
-  await videoMaker.export(outputPath);
+  await videoMaker.export(outputPath,{usePipe:true});
   const endTime = Date.now();
   const duration = ((endTime - startTime) / 1000).toFixed(2);
   
