@@ -217,6 +217,11 @@ export class TextElement extends BaseElement {
 
     // 如果启用了分割，渲染所有子片段
     if (this.split && this.segments.length > 0) {
+      // 先检查父元素是否在活动时间范围内
+      if (!this.isActiveAtTime(time)) {
+        return null;
+      }
+      
       // 渲染所有子片段
       // 参考 FKVideo 的实现：对于分割文本，每个片段有自己的 segmentDelay
       // 动画的 delay 不需要调整，而是调整计算动画时使用的时间

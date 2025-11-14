@@ -180,9 +180,8 @@ export class VideoElement extends BaseElement {
       this.finalWidth = finalWidth;
       this.finalHeight = finalHeight;
 
-      // 缓冲所有帧（无论是否循环），以便根据进度随机访问
-      // 这样可以避免顺序读取导致的帧不匹配问题
-      try {
+      // 如果启用循环，先缓冲所有帧
+      if (this.loop) {
         while (true) {
           const { value, done } = await this.frameIterator.next();
           if (done) break;
@@ -190,10 +189,6 @@ export class VideoElement extends BaseElement {
             this.frameBuffer.push(Buffer.from(value));
           }
         }
-        console.log(`[VideoElement] 已缓冲 ${this.frameBuffer.length} 帧`);
-      } catch (err) {
-        console.warn(`[VideoElement] 缓冲帧时出错: ${err.message}`);
-        // 即使缓冲失败，也继续（可能视频较短或已结束）
       }
 
       // 如果不禁音，提取视频中的音频
@@ -246,27 +241,21 @@ export class VideoElement extends BaseElement {
     try {
       let rgba;
 
-      // 如果已缓冲帧，从缓冲区获取
-      if (this.frameBuffer.length > 0) {
-        let frameIndex;
-        if (this.loop) {
-          // 循环模式：根据进度循环获取帧
-          frameIndex = Math.floor(progress * this.frameBuffer.length) % this.frameBuffer.length;
-        } else {
-          // 正常模式：根据进度获取对应帧
-          frameIndex = Math.floor(progress * this.frameBuffer.length);
-          frameIndex = Math.min(frameIndex, this.frameBuffer.length - 1);
-        }
+      if (this.loop && this.frameBuffer.length > 0) {
+        // 循环模式：从缓冲的帧中获取
+        const frameIndex = Math.floor(progress * this.frameBuffer.length) % this.frameBuffer.length;
         rgba = this.frameBuffer[frameIndex];
       } else {
-        // 如果没有缓冲，尝试从迭代器获取（不推荐，可能导致帧不匹配）
+        // 正常模式：从迭代器获取
         try {
           const { value, done } = await this.frameIterator.next();
           if (done) {
+            // 如果迭代器结束，尝试重新初始化（可能是视频较短）
             return null;
           }
           rgba = value ? Buffer.from(value) : null;
         } catch (err) {
+          // 迭代器错误，可能是流已关闭
           console.warn('Frame iterator error:', err.message);
           return null;
         }

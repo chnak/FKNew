@@ -94,10 +94,17 @@ export class Track {
     });
     
     // 构建所有场景，获取它们的元素
+    // 按 startTime 排序场景，确保场景按时间顺序处理
+    const sortedScenes = [...this.scenes].sort((a, b) => {
+      const aStartTime = a.startTime !== undefined ? a.startTime : 0;
+      const bStartTime = b.startTime !== undefined ? b.startTime : 0;
+      return aStartTime - bStartTime;
+    });
+    
     let currentTime = 0;
     
-    for (let i = 0; i < this.scenes.length; i++) {
-      const scene = this.scenes[i];
+    for (let i = 0; i < sortedScenes.length; i++) {
+      const scene = sortedScenes[i];
       const sceneStartTime = scene.startTime !== undefined ? scene.startTime : currentTime;
       
       // 构建场景，返回元素实例数组
@@ -108,6 +115,10 @@ export class Track {
         // 设置元素的绝对时间（相对于视频开始）
         const relativeStartTime = element.startTime || 0;
         const absoluteStartTime = sceneStartTime + relativeStartTime;
+        
+        // 如果是分割文本，需要在更新父元素的 startTime 之前保存相对开始时间
+        const parentRelativeStartTime = relativeStartTime;
+        
         element.startTime = absoluteStartTime;
         
         // 更新元素的 endTime（基于绝对时间）
@@ -130,11 +141,36 @@ export class Track {
           element.canvasWidth = videoMaker.width;
           element.canvasHeight = videoMaker.height;
           
-          // 如果是分割文本，也需要设置子元素的 canvasWidth 和 canvasHeight
-          if (element.type === 'text' && element.segments) {
+          // 如果是分割文本，也需要设置子元素的 canvasWidth 和 canvasHeight，并更新时间
+          if (element.type === 'text' && element.segments && element.segments.length > 0) {
+            
             for (const segment of element.segments) {
               segment.canvasWidth = videoMaker.width;
               segment.canvasHeight = videoMaker.height;
+              
+              // 更新子片段的绝对时间（相对于视频开始）
+              // 子片段的 startTime 在 _initializeSplitter 中是基于父元素的相对 startTime 计算的
+              // 格式：segmentStartTime = parentStartTime + index * splitDelay
+              // 其中 parentStartTime 是父元素相对于场景的开始时间
+              // 所以子片段的相对开始时间 = 父元素的相对开始时间 + 偏移
+              const segmentRelativeStartTime = segment.startTime || 0;
+              
+              // 计算子片段相对于父元素的偏移时间（在父元素更新为绝对时间之前计算）
+              const segmentOffset = segmentRelativeStartTime - parentRelativeStartTime;
+              
+              // 子片段的绝对时间 = 父元素的绝对时间 + 子片段相对于父元素的偏移
+              const segmentAbsoluteStartTime = absoluteStartTime + segmentOffset;
+              segment.startTime = segmentAbsoluteStartTime;
+              
+              // 更新子片段的 endTime
+              if (segment.duration !== undefined) {
+                segment.endTime = segmentAbsoluteStartTime + segment.duration;
+              } else if (segment.endTime !== Infinity) {
+                // 计算子片段的相对结束时间
+                const segmentRelativeEndTime = segment.endTime;
+                const segmentEndOffset = segmentRelativeEndTime - parentRelativeStartTime;
+                segment.endTime = absoluteStartTime + segmentEndOffset;
+              }
             }
           }
           
