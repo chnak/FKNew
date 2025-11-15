@@ -36,17 +36,38 @@ async function main() {
     // },
     // 使用元素配置中的 onFrame 回调
     onFrame: function(element, event, paperItem) {
-      // event: { count, time, delta }
-      // paperItem: Paper.js 项目引用
+      // ========== 参数说明 ==========
+      // element: 元素实例，可以访问元素配置、状态和方法
+      //   - element.config: 元素配置对象（x, y, width, height, color 等）
+      //   - element.type: 元素类型（'circle', 'text', 'rect' 等）
+      //   - element.getProgressAtTime(time): 获取元素进度（0-1）
+      //   - element.isActiveAtTime(time): 判断元素是否激活
+      //
+      // event: 帧事件对象，包含当前帧的信息
+      //   - event.count: 帧计数（从0开始，每帧递增1）
+      //   - event.time: 当前时间（秒，相对于视频开始）
+      //   - event.delta: 帧间隔（秒，如30fps时约为0.033秒）
+      //
+      // paperItem: Paper.js 项目引用，可以直接操作 Paper.js 原生属性
+      //   - paperItem.position: 位置（paper.Point）
+      //   - paperItem.rotation: 旋转角度（度）
+      //   - paperItem.scaling: 缩放（paper.Point）
+      //   - paperItem.fillColor: 填充颜色（paper.Color）
+      //   - paperItem.fillColor.hue: 色相（0-360）
+      //   - paperItem.opacity: 透明度（0-1）
+      
       if (paperItem) {
-        // 在 onFrame 中实现动画
-        // 使用 event.time 来实现基于时间的动画
+        // 使用 event.time 实现基于时间的旋转动画
         const rotation = event.time * 60; // 每秒旋转60度
         paperItem.rotation = rotation;
         
-        // 实现缩放动画
+        // 使用 event.time 实现缩放动画（呼吸效果）
         const scale = 1 + Math.sin(event.time * Math.PI * 2) * 0.3;
         paperItem.scaling = new paper.Point(scale, scale);
+        
+        // 使用 event.time 修改颜色色相（颜色循环）
+        // 注意：直接修改 hue 会导致颜色累积变化，建议使用 event.time 计算
+        paperItem.fillColor.hue = (event.time * 60) % 360;
         
         // 也可以使用 event.count 来实现基于帧数的动画
         // const rotation = event.count * 2; // 每帧旋转2度
@@ -71,96 +92,7 @@ async function main() {
     // },
   });
 
-  // 场景2: 使用 onFrame 实现多个元素的协同动画
-  const scene2 = track.createScene({ duration: 5, startTime: 5 });
-  scene2.addBackground({ color: '#16213e' });
   
-  // 创建一个全局的 onFrame 处理器来管理多个元素
-  let globalFrameCount = 0;
-  const animatedItems = [];
-  
-  for (let i = 0; i < 5; i++) {
-    (function(index) {
-      scene2.addCircle({
-        x: `${20 + index * 15}%`,
-        y: '50%',
-        radius: 50,
-        bgcolor: `hsl(${index * 60}, 70%, 60%)`,
-        duration: 5,
-        startTime: 0,
-        animations: [
-          { type: 'fade', fromOpacity: 0, toOpacity: 1, duration: 0.5 },
-        ],
-        // onLoaded: function(element, time) {
-        //   // 将元素添加到动画列表
-        //   animatedItems.push({
-        //     element: element,
-        //     index: index,
-        //     phase: index * 0.5, // 每个元素有不同的相位
-        //   });
-        // },
-        onRender: function(element, time) {
-          // 在 onRender 中实现类似 onFrame 的动画
-          // 使用全局帧计数或时间来实现协同动画
-          const phase = index * 0.5;
-          const wave = Math.sin((time * Math.PI * 2) + phase) * 100;
-          const canvasHeight = 1080;
-          const yPercent = 50 - (wave / canvasHeight * 100);
-          element.config.y = `${yPercent}%`;
-          
-          // 旋转动画
-          element.config.rotation = time * 90 + index * 45;
-        },
-      });
-    })(i);
-  }
-
-  // 场景3: 演示如何在 onLoaded 中设置 Paper.js 项目级别的 onFrame
-  const scene3 = track.createScene({ duration: 5, startTime: 10 });
-  scene3.addBackground({ color: '#0f3460' });
-  
-  scene3.addRect({
-    x: '50%',
-    y: '50%',
-    width: 200,
-    height: 200,
-    bgcolor: '#4ecdc4',
-    borderRadius: 20,
-    duration: 5,
-    startTime: 0,
-    // onLoaded: function(element, time) {
-    //   console.log('✅ [RectElement] onLoaded - 尝试设置 Paper.js onFrame');
-      
-    //   // 尝试访问 Paper.js 的 view
-    //   if (paper.view) {
-    //     // 保存原始的 onFrame（如果有）
-    //     const originalOnFrame = paper.view.onFrame;
-        
-    //     // 设置新的 onFrame
-    //     paper.view.onFrame = function(event) {
-    //       // 调用原始的 onFrame（如果有）
-    //       if (originalOnFrame) {
-    //         originalOnFrame(event);
-    //       }
-          
-    //       // 实现自定义动画逻辑
-    //       // 注意：在 Node.js 环境中，onFrame 可能不会自动触发
-    //       // 需要手动调用或使用其他方式
-    //     };
-        
-    //     console.log('Paper.js view.onFrame 已设置（但可能在 Node.js 中不会自动触发）');
-    //   }
-    // },
-    // onRender: function(element, time) {
-    //   // 在 onRender 中实现动画（这是更可靠的方式）
-    //   element.config.rotation = time * 180; // 每秒旋转180度
-      
-    //   const scale = 1 + Math.sin(time * Math.PI * 3) * 0.2;
-    //   element.config.scaleX = scale;
-    //   element.config.scaleY = scale;
-    // },
-  });
-
   // 导出视频
   const outputPath = path.join(__dirname, '../output/test-paper-onframe.mp4');
   console.log('\n开始导出视频...');
