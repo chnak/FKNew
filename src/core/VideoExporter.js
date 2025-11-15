@@ -350,7 +350,7 @@ export class VideoExporter {
           const activeTransition = transitions.find(t => 
             time >= t.startTime && time < t.endTime
           );
-          
+       
           let buffer;
           if (activeTransition) {
             // 有转场，渲染转场效果
@@ -410,6 +410,9 @@ export class VideoExporter {
    * @returns {Promise<Buffer>} PNG buffer
    */
   async renderFrameWithTransition(composition, time, transition, backgroundColor, transitionRenderers) {
+    // 方案三：使用主 renderer 渲染转场场景，避免创建新的 Renderer 实例
+    // 这样可以避免 Paper.js 全局状态被切换，影响主 renderer 的后续渲染
+    
     // 计算转场进度（0-1）
     // 转场时间范围：transition.startTime 到 transition.endTime
     // 转场实际时长：transition.endTime - transition.startTime
@@ -437,121 +440,31 @@ export class VideoExporter {
     });
     
     // 渲染 from 场景的最后一帧
+    // 使用主 renderer，传入 from 场景结束时的绝对时间
     const fromScene = transition.fromScene;
     const fromBackgroundColor = fromScene.backgroundLayer?.config?.backgroundColor || backgroundColor;
+    const fromSceneEndTime = transition.startTime; // from 场景结束时间就是转场开始时间
     
-    // 为from场景创建临时composition
-    const { VideoMaker } = await import('../core/VideoMaker.js');
-    const fromComposition = new VideoMaker({
-      width: composition.width,
-      height: composition.height,
-      fps: composition.fps,
-      duration: fromScene.duration,
-      backgroundColor: fromBackgroundColor,
-    });
-    // 构建from场景的元素（相对于场景开始时间0）
-    const fromSceneElements = fromScene.build(0);
-    const fromLayer = fromComposition.createElementLayer({ zIndex: 1 });
-    for (const element of fromSceneElements) {
-      if (element.type !== 'audio') {
-        // 克隆元素，避免修改原始元素
-        const clonedElement = Object.assign(Object.create(Object.getPrototypeOf(element)), element);
-        // 调整元素时间，使其在场景结束时显示
-        // 元素的时间是相对于场景的，所以需要调整
-        const elementRelativeTime = clonedElement.startTime || 0;
-        // 如果元素在场景结束时还在显示，调整时间使其在转场期间显示
-        if (elementRelativeTime < fromScene.duration) {
-          // 元素在场景结束前，确保元素在场景结束时仍然显示
-          // 不需要调整startTime，只需要确保endTime足够长
-          if (clonedElement.duration !== undefined) {
-            // 如果元素有duration，确保它在场景结束时仍然显示
-            const elementEndTime = elementRelativeTime + clonedElement.duration;
-            if (elementEndTime < fromScene.duration) {
-              // 元素在场景结束前就结束了，延长它的显示时间
-              clonedElement.endTime = fromScene.duration;
-            }
-          } else {
-            // 元素没有duration，使用场景的持续时间
-            clonedElement.endTime = fromScene.duration;
-          }
-        }
-        clonedElement.canvasWidth = composition.width;
-        clonedElement.canvasHeight = composition.height;
-        fromLayer.addElement(clonedElement);
-      }
-    }
-    
-    const fromRenderer = new Renderer({
-      width: composition.width,
-      height: composition.height,
-      fps: composition.fps,
-    });
-    await fromRenderer.init();
-    // 渲染场景的最后一帧（场景结束时的状态）
-    // 使用场景的持续时间来渲染场景结束时的状态
-    await fromRenderer.renderFrame(fromComposition.timeline.getLayers(), fromScene.duration, fromBackgroundColor);
-    // 从Canvas获取RGBA Buffer
-    const fromCanvas = fromRenderer.canvas;
+    // 使用主 renderer 渲染 from 场景的最后一帧
+    await this.renderer.renderFrame(composition.timeline.getLayers(), fromSceneEndTime, fromBackgroundColor);
+    const fromCanvas = this.renderer.canvas;
     const fromCtx = fromCanvas.getContext('2d');
     const fromImageData = fromCtx.getImageData(0, 0, fromCanvas.width, fromCanvas.height);
     const fromBuffer = Buffer.from(fromImageData.data);
-    fromRenderer.destroy();
-    fromComposition.destroy();
     
     // 渲染 to 场景的第一帧
+    // 使用主 renderer，传入 to 场景开始时的绝对时间（转场开始时间）
+    // 转场期间，to 场景从转场开始时间就开始显示，只是混合度从 0 到 1
     const toScene = transition.toScene;
     const toBackgroundColor = toScene.backgroundLayer?.config?.backgroundColor || backgroundColor;
+    const toSceneStartTime = transition.startTime; // to 场景开始时间就是转场开始时间
     
-    // 为to场景创建临时composition
-    const toComposition = new VideoMaker({
-      width: composition.width,
-      height: composition.height,
-      fps: composition.fps,
-      duration: toScene.duration,
-      backgroundColor: toBackgroundColor,
-    });
-    // 构建to场景的元素（相对于场景开始时间0）
-    const toSceneElements = toScene.build(0);
-    const toLayer = toComposition.createElementLayer({ zIndex: 1 });
-    for (const element of toSceneElements) {
-      if (element.type !== 'audio') {
-        // 克隆元素，避免修改原始元素
-        const clonedElement = Object.assign(Object.create(Object.getPrototypeOf(element)), element);
-        // 元素的时间已经是相对于场景的（因为build(0)）
-        // 确保元素在时间0时是激活的
-        // 元素的时间是相对于场景的，所以startTime应该是0或更小
-        if (clonedElement.startTime === undefined || clonedElement.startTime > 0) {
-          clonedElement.startTime = 0;
-        }
-        // 确保endTime正确设置
-        if (clonedElement.duration !== undefined) {
-          clonedElement.endTime = clonedElement.startTime + clonedElement.duration;
-        } else if (clonedElement.endTime === Infinity || clonedElement.endTime === undefined) {
-          clonedElement.endTime = toScene.duration;
-        }
-        clonedElement.canvasWidth = composition.width;
-        clonedElement.canvasHeight = composition.height;
-        toLayer.addElement(clonedElement);
-      }
-    }
-    
-    const toRenderer = new Renderer({
-      width: composition.width,
-      height: composition.height,
-      fps: composition.fps,
-    });
-    await toRenderer.init();
-    // 渲染场景的第一帧（场景开始时的状态）
-    // 使用时间0来渲染场景开始时的状态
-    await toRenderer.renderFrame(toComposition.timeline.getLayers(), 0, toBackgroundColor);
-    
-    // 从Canvas获取RGBA Buffer
-    const toCanvas = toRenderer.canvas;
+    // 使用主 renderer 渲染 to 场景的第一帧
+    await this.renderer.renderFrame(composition.timeline.getLayers(), toSceneStartTime, toBackgroundColor);
+    const toCanvas = this.renderer.canvas;
     const toCtx = toCanvas.getContext('2d');
     const toImageData = toCtx.getImageData(0, 0, toCanvas.width, toCanvas.height);
     const toBuffer = Buffer.from(toImageData.data);
-    toRenderer.destroy();
-    toComposition.destroy();
     
     // 使用转场函数混合两个场景
     const resultBuffer = transitionFunction({

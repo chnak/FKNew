@@ -103,13 +103,11 @@ export class Renderer {
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // 复用已初始化的 Paper.js project，避免重复 setup
-    // 注意：在并行渲染中，每个 Renderer 实例是独立的，所以可以安全地复用
-    if (!this.project || paper.project !== this.project) {
-      // 如果 project 不存在或已被切换，重新 setup
-      paper.setup(this.canvas);
-      this.project = paper.project;
-    }
+    // 每次渲染都重新 setup Paper.js project，确保状态独立
+    // 这样可以避免转场渲染时切换全局 paper.project 影响主 renderer
+    // 虽然性能略有损失，但能保证渲染状态的正确性
+    paper.setup(this.canvas);
+    this.project = paper.project;
 
     // 清空 Paper.js 场景（复用 project 时只需要清空子元素）
     if (this.project && this.project.activeLayer) {
