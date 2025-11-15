@@ -489,18 +489,51 @@ export class VideoExporter {
    * @param {string|null} tempDir - 临时目录，如果为 null 则不保存文件（仅渲染）
    */
   async renderFramesSerial(composition, totalFrames, startTime, fps, tempDir, backgroundColor) {
+    // 初始化转场渲染器（如果有转场）
+    const transitions = composition.transitions || [];
+    const transitionRenderers = new Map();
+    
+    // 调试信息：打印转场信息
+    if (transitions.length > 0) {
+      console.log(`检测到 ${transitions.length} 个转场:`);
+      transitions.forEach((t, i) => {
+        // 确保 startTime 和 endTime 存在且正确
+        const tStartTime = t.startTime !== undefined ? t.startTime : 0;
+        const tEndTime = t.endTime !== undefined ? t.endTime : (tStartTime + (t.duration || 0));
+        const duration = t.duration || 0;
+        console.log(`  转场 ${i + 1}: ${t.name}, 时间范围: ${tStartTime.toFixed(3)}s - ${tEndTime.toFixed(3)}s, 时长: ${duration.toFixed(3)}s`);
+      });
+    }
+    
     for (let frame = 0; frame < totalFrames; frame++) {
       try {
         const time = startTime + frame / fps;
         const frameNumber = frame + 1;
 
-        // 渲染帧（传入背景色）
-        await this.renderer.renderFrame(composition.timeline.getLayers(), time, backgroundColor);
+        // 检查是否有转场
+        const activeTransition = transitions.find(t => 
+          time >= t.startTime && time < t.endTime
+        );
+        
+        let buffer;
+        if (activeTransition) {
+          // 有转场，渲染转场效果
+          buffer = await this.renderFrameWithTransition(
+            composition, 
+            time, 
+            activeTransition, 
+            backgroundColor,
+            transitionRenderers
+          );
+        } else {
+          // 正常渲染帧（转场期间或转场结束后）
+          await this.renderer.renderFrame(composition.timeline.getLayers(), time, backgroundColor);
+          buffer = this.renderer.getCanvasBuffer();
+        }
 
         // 如果提供了 tempDir，保存帧
         if (tempDir) {
           const framePath = path.join(tempDir, `frame_${frameNumber.toString().padStart(4, '0')}.png`);
-          const buffer = this.renderer.getCanvasBuffer();
           await fs.writeFile(framePath, buffer);
         }
 
