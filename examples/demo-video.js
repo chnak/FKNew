@@ -144,7 +144,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene2StartTime,
   })
-    .addBackground({ color: 'colors.carafe' })
+    .addBackground({ color: colors.carafe })
     .addText({
       text: '丰富的文本动画',
       color: colors.white,
@@ -161,7 +161,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '淡入淡出',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 48,
       x: '25%',
       y: '35%',
@@ -173,7 +173,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '缩放进入',
-      color: 'colors.blue',
+      color: colors.blue,
       fontSize: 48,
       x: '50%',
       y: '35%',
@@ -185,7 +185,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '弹跳效果',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 48,
       x: '75%',
       y: '35%',
@@ -197,7 +197,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '文字拆分动画',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 64,
       x: '50%',
       y: '60%',
@@ -247,7 +247,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene3StartTime,
   })
-    .addBackground({ color: 'colors.navyBlue' })
+    .addBackground({ color: colors.navyBlue })
     .addText({
       text: '丰富的图形元素',
       color: colors.white,
@@ -266,7 +266,7 @@ async function createDemoVideo() {
       y: '45%',
       width: 300,
       height: 200,
-      bgcolor: 'colors.champagne',
+      bgcolor: colors.champagne,
       borderRadius: 20,
       anchor: [0.5, 0.5],
       duration: 3,
@@ -279,7 +279,7 @@ async function createDemoVideo() {
       x: '50%',
       y: '45%',
       radius: 100,
-      bgcolor: 'colors.blue',
+      bgcolor: colors.blue,
       anchor: [0.5, 0.5],
       duration: 3,
       startTime: 0.8,
@@ -291,7 +291,7 @@ async function createDemoVideo() {
       x: '75%',
       y: '45%',
       radius: 100,
-      bgcolor: 'colors.champagne',
+      bgcolor: colors.champagne,
       anchor: [0.5, 0.5],
       duration: 3,
       startTime: 1.1,
@@ -301,7 +301,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '矩形 · 圆形 · 路径',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 48,
       x: '50%',
       y: '70%',
@@ -327,7 +327,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene4StartTime,
   })
-    .addBackground({ color: 'colors.carafe' })
+    .addBackground({ color: colors.carafe })
     .addText({
       text: '丰富的转场效果',
       color: colors.white,
@@ -343,7 +343,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '淡入淡出 · 交叉缩放 · 圆形裁剪',
-      color: 'colors.blue',
+      color: colors.blue,
       fontSize: 42,
       x: '50%',
       y: '45%',
@@ -355,7 +355,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '漩涡 · 方向擦除 · 弹跳',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 42,
       x: '50%',
       y: '55%',
@@ -367,7 +367,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '支持 gl-transitions 所有效果',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 36,
       x: '50%',
       y: '70%',
@@ -393,7 +393,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene5StartTime,
   })
-    .addBackground({ color: 'colors.navyBlue' })
+    .addBackground({ color: colors.navyBlue })
     .addText({
       text: '多轨道多场景系统',
       color: colors.white,
@@ -409,7 +409,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '灵活的轨道管理',
-      color: 'colors.blue',
+      color: colors.blue,
       fontSize: 48,
       x: '25%',
       y: '50%',
@@ -421,7 +421,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '精确的时间控制',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 48,
       x: '50%',
       y: '50%',
@@ -433,7 +433,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '场景叠加组合',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 48,
       x: '75%',
       y: '50%',
@@ -452,7 +452,7 @@ async function createDemoVideo() {
   })
     .addText({
       text: '轨道叠加示例',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 36,
       x: '50%',
       y: '75%',
@@ -480,7 +480,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene6StartTime,
   })
-    .addBackground({ color: 'colors.carafe' })
+    .addBackground({ color: colors.carafe })
     .addText({
       text: 'onFrame 持续动画',
       color: colors.white,
@@ -499,7 +499,7 @@ async function createDemoVideo() {
       x: '25%',
       y: '45%',
       radius: 60,
-      bgcolor: 'colors.blue',
+      bgcolor: colors.blue,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.5,
@@ -517,7 +517,7 @@ async function createDemoVideo() {
       x: '50%',
       y: '45%',
       radius: 60,
-      bgcolor: 'colors.champagne',
+      bgcolor: colors.champagne,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.8,
@@ -541,7 +541,7 @@ async function createDemoVideo() {
       x: '75%',
       y: '45%',
       radius: 60,
-      bgcolor: 'colors.champagne',
+      bgcolor: colors.champagne,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1.1,
@@ -562,7 +562,7 @@ async function createDemoVideo() {
       x: '50%',
       y: '65%',
       radius: 50,
-      bgcolor: 'colors.blue',
+      bgcolor: colors.blue,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1.4,
@@ -580,7 +580,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '旋转 · 脉冲 · 闪烁 · 颜色变化',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 42,
       x: '50%',
       y: '80%',
@@ -606,7 +606,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene7StartTime,
   })
-    .addBackground({ color: 'colors.navyBlue' })
+    .addBackground({ color: colors.navyBlue })
     .addText({
       text: 'SVG 元素支持',
       color: colors.white,
@@ -688,7 +688,7 @@ async function createDemoVideo() {
   })
     .addText({
       text: '支持 SVG 字符串和文件',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 42,
       x: '50%',
       y: '75%',
@@ -714,7 +714,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene8StartTime,
   })
-    .addBackground({ color: 'colors.carafe' })
+    .addBackground({ color: colors.carafe })
     .addText({
       text: '图片元素支持',
       color: colors.white,
@@ -740,7 +740,7 @@ async function createDemoVideo() {
   for (const imageFile of imageFiles) {
     if (await fs.pathExists(imageFile)) {
       const xPositions = ['25%', '50%', '75%'];
-      const colors = ['colors.blue', 'colors.champagne', 'colors.champagne'];
+      const borderColors = [colors.blue, colors.champagne, colors.champagne];
       scene8.addImage({
         src: imageFile,
         x: xPositions[imageIndex],
@@ -753,7 +753,7 @@ async function createDemoVideo() {
         startTime: 0.5 + imageIndex * 0.2,
         animations: ['fadeIn', 'zoomIn'],
         borderWidth: 3,
-        borderColor: [colors.blue, colors.champagne, colors.champagne][imageIndex],
+        borderColor: borderColors[imageIndex],
         borderRadius: 10,
       });
       imageIndex++;
@@ -765,7 +765,7 @@ async function createDemoVideo() {
   if (imageIndex === 0) {
     scene8.addText({
       text: '（需要图片文件才能显示）',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 36,
       x: '50%',
       y: '50%',
@@ -779,7 +779,7 @@ async function createDemoVideo() {
 
   scene8.addText({
     text: '多种适配模式 · 边框圆角 · 动画效果',
-    color: 'colors.champagne',
+    color: colors.champagne,
     fontSize: 42,
     x: '50%',
     y: '85%',
@@ -805,7 +805,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene9StartTime,
   })
-    .addBackground({ color: 'colors.navyBlue' })
+    .addBackground({ color: colors.navyBlue })
     .addText({
       text: '视频元素支持',
       color: colors.white,
@@ -842,7 +842,7 @@ async function createDemoVideo() {
   } else {
     scene9.addText({
       text: '（需要视频文件才能显示）',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 36,
       x: '50%',
       y: '50%',
@@ -856,7 +856,7 @@ async function createDemoVideo() {
 
   scene9.addText({
     text: '视频播放 · 裁剪循环 · 多种适配',
-    color: 'colors.champagne',
+    color: colors.champagne,
     fontSize: 42,
     x: '50%',
     y: '85%',
@@ -882,7 +882,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene10StartTime,
   })
-    .addBackground({ color: 'colors.carafe' })
+    .addBackground({ color: colors.carafe })
     .addText({
       text: 'Path 路径元素',
       color: colors.white,
@@ -969,7 +969,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '自定义路径 · 平滑曲线 · 动态效果',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 42,
       x: '50%',
       y: '80%',
@@ -995,7 +995,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene11StartTime,
   })
-    .addBackground({ color: 'colors.carafe' })
+    .addBackground({ color: colors.carafe })
     .addText({
       text: '音频示波器',
       color: colors.white,
@@ -1065,7 +1065,7 @@ async function createDemoVideo() {
       particleCount: 50,
       particleMinSize: 2,
       particleMaxSize: 8,
-      particleColors: ['colors.champagne', 'colors.champagne', 'colors.blue'],
+      particleColors: [colors.champagne, colors.champagne, colors.blue],
       mirror: true,
       sensitivity: 1.5,
       windowSize: 0.1,
@@ -1094,7 +1094,7 @@ async function createDemoVideo() {
   } else {
     scene9.addText({
       text: '（需要音频文件才能显示示波器）',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 36,
       x: '50%',
       y: '50%',
@@ -1108,7 +1108,7 @@ async function createDemoVideo() {
 
   scene11.addText({
     text: '线条 · 柱状 · 粒子 · Blob',
-    color: 'colors.champagne',
+    color: colors.champagne,
     fontSize: 42,
     x: '50%',
     y: '85%',
@@ -1134,7 +1134,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene12StartTime,
   })
-    .addBackground({ color: 'colors.navyBlue' })
+    .addBackground({ color: colors.navyBlue })
     .addText({
       text: '核心特性',
       color: colors.white,
@@ -1147,13 +1147,13 @@ async function createDemoVideo() {
       fontFamily: 'MicrosoftYaHei',
       fontWeight: 'bold',
       textGlow: true,
-      textGlowColor: 'colors.blue',
+      textGlowColor: colors.blue,
       textGlowBlur: 40,
       animations: ['fadeIn'],
     })
     .addText({
       text: '🎬 多轨道多场景',
-      color: 'colors.blue',
+      color: colors.blue,
       fontSize: 42,
       x: '50%',
       y: '40%',
@@ -1165,7 +1165,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '🎨 丰富的元素类型',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 42,
       x: '50%',
       y: '48%',
@@ -1177,7 +1177,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '✨ 强大的动画系统',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 42,
       x: '50%',
       y: '56%',
@@ -1189,7 +1189,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '🎭 丰富的转场效果',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 42,
       x: '50%',
       y: '64%',
@@ -1201,7 +1201,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '🚀 高性能渲染',
-      color: 'colors.blue',
+      color: colors.blue,
       fontSize: 42,
       x: '50%',
       y: '72%',
@@ -1227,7 +1227,7 @@ async function createDemoVideo() {
     duration: sceneDuration,
     startTime: scene13StartTime,
   })
-    .addBackground({ color: 'colors.navyBlue' })
+    .addBackground({ color: colors.navyBlue })
     .addText({
       text: 'FKbuilder',
       color: colors.white,
@@ -1240,13 +1240,13 @@ async function createDemoVideo() {
       fontFamily: 'MicrosoftYaHei',
       fontWeight: 'bold',
       textGlow: true,
-      textGlowColor: 'colors.blue',
+      textGlowColor: colors.blue,
       textGlowBlur: 50,
       animations: ['fadeIn', 'zoomIn'],
     })
     .addText({
       text: '开始你的视频创作之旅',
-      color: 'colors.blue',
+      color: colors.blue,
       fontSize: 56,
       x: '50%',
       y: '55%',
@@ -1261,7 +1261,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: '基于 Node.js 的纯 JavaScript 视频制作库',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 36,
       x: '50%',
       y: '70%',
@@ -1273,7 +1273,7 @@ async function createDemoVideo() {
     })
     .addText({
       text: 'https://github.com/chnak/FKbuilder',
-      color: 'colors.champagne',
+      color: colors.champagne,
       fontSize: 32,
       x: '50%',
       y: '85%',
