@@ -236,8 +236,11 @@ export class PathElement extends BaseElement {
     // 添加到 layer
     layer.addChild(path);
     
-    // 调用 onRender 回调
-    this._callOnRender(time);
+    // 保存 Paper.js 项目引用（用于 onFrame 回调）
+    this._paperItem = path;
+    
+    // 调用 onRender 回调，传递 Paper.js 项目引用
+    this._callOnRender(time, path);
     
     return path;
   }
