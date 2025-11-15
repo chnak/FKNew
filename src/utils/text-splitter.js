@@ -1,8 +1,10 @@
 /**
  * 文本分割工具类
  * 用于将文本按字符、单词或行进行分割，并计算每个片段的位置和尺寸
- * 注意：使用估算方式计算文本尺寸，不使用 Canvas API
+ * 使用 Canvas API 准确计算文本尺寸
  */
+import { createCanvas } from 'canvas';
+
 export class TextSplitter {
   constructor(text, options = {}) {
     this.text = text || '';
@@ -22,6 +24,11 @@ export class TextSplitter {
       ...options
     };
 
+    // 创建 Canvas 上下文用于测量文本
+    this.canvas = createCanvas(1, 1);
+    this.ctx = this.canvas.getContext('2d');
+    this._setupCanvasContext();
+
     // 存储分割后的数据
     this.characters = [];
     this.words = [];
@@ -39,32 +46,27 @@ export class TextSplitter {
   }
 
   /**
-   * 估算文本宽度（不使用 Canvas API）
+   * 设置 Canvas 上下文字体
+   */
+  _setupCanvasContext() {
+    const { fontSize, fontFamily, fontWeight, fontStyle } = this.options;
+    // 构建字体字符串：fontStyle fontWeight fontSize fontFamily
+    const fontString = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+    this.ctx.font = fontString;
+    // 设置文本基线
+    this.ctx.textBaseline = 'alphabetic';
+    this.ctx.textAlign = 'left';
+  }
+
+  /**
+   * 使用 Canvas API 准确测量文本宽度
    */
   _measureText(text) {
     if (!text) return 0;
     
-    const { fontSize } = this.options;
-    let totalWidth = 0;
-    
-    // 遍历每个字符，估算宽度
-    for (const char of text) {
-      if (this._isSpace(char)) {
-        // 空格字符
-        totalWidth += fontSize * 0.25;
-      } else if (this._isSymbol(char)) {
-        // 符号字符
-        totalWidth += fontSize * 0.5;
-      } else if (/[\u4e00-\u9fa5]/.test(char)) {
-        // 中文字符
-        totalWidth += fontSize;
-      } else {
-        // 英文字母和数字
-        totalWidth += fontSize * 0.6;
-      }
-    }
-    
-    return totalWidth;
+    // 使用 Canvas API 的 measureText 方法，这是最准确的方式
+    const metrics = this.ctx.measureText(text);
+    return metrics.width;
   }
 
   /**
@@ -93,16 +95,8 @@ export class TextSplitter {
       const isSpace = this._isSpace(char);
       const isSymbol = this._isSymbol(char);
       
-      // 测量字符宽度
-      let charWidth = this._measureText(char);
-      
-      // 对于空格，使用更准确的宽度
-      if (isSpace) {
-        charWidth = this.options.fontSize * 0.25;
-      } else if (isSymbol) {
-        // 符号字符可能需要特殊处理
-        charWidth = Math.max(charWidth, this.options.fontSize * 0.3);
-      }
+      // 使用 Canvas API 准确测量字符宽度
+      const charWidth = this._measureText(char);
 
       this.characters.push({
         text: char,
@@ -129,14 +123,8 @@ export class TextSplitter {
       const word = parts[i];
       const isSpace = word.trim() === '';
       
-      // 测量单词宽度
-      let wordWidth = this._measureText(word);
-      
-      // 对于空格单词，使用更准确的宽度
-      if (isSpace) {
-        const spaceCount = word.length;
-        wordWidth = spaceCount * this.options.fontSize * 0.25;
-      }
+      // 使用 Canvas API 准确测量单词宽度
+      const wordWidth = this._measureText(word);
 
       this.words.push({
         text: word,
@@ -152,13 +140,16 @@ export class TextSplitter {
 
   /**
    * 创建行分割
+   * 保留所有行，包括空行（只包含空格的行）
    */
   _createLines() {
     this.lines = [];
-    const lines = this.text.split('\n').filter(line => line.trim().length > 0);
+    // 保留所有行，不过滤空行或只包含空格的行
+    const lines = this.text.split('\n');
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      // 使用 Canvas API 准确测量行宽度（包括空行）
       const lineWidth = this._measureText(line);
 
       this.lines.push({
@@ -460,7 +451,13 @@ export class TextSplitter {
    * 清理资源
    */
   destroy() {
-    // 不再需要清理 Canvas
+    // 清理 Canvas 上下文
+    if (this.canvas) {
+      this.canvas.width = 0;
+      this.canvas.height = 0;
+      this.ctx = null;
+      this.canvas = null;
+    }
   }
 }
 
