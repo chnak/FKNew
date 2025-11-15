@@ -103,11 +103,18 @@ export class Renderer {
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // 每次渲染都重新 setup Paper.js project，确保状态独立
-    // 这样可以避免转场渲染时切换全局 paper.project 影响主 renderer
-    // 虽然性能略有损失，但能保证渲染状态的正确性
-    paper.setup(this.canvas);
-    this.project = paper.project;
+    // 确保使用当前 renderer 的 project（可能被转场渲染切换了）
+    // 如果 paper.project 不是当前 renderer 的 project，切换回来
+    if (paper.project !== this.project) {
+      // 如果 project 不存在，重新 setup
+      if (!this.project) {
+        paper.setup(this.canvas);
+        this.project = paper.project;
+      } else {
+        // 切换回当前 renderer 的 project
+        paper.project = this.project;
+      }
+    }
 
     // 清空 Paper.js 场景（复用 project 时只需要清空子元素）
     if (this.project && this.project.activeLayer) {

@@ -24,9 +24,11 @@ export class SVGElement extends BaseElement {
     // 加载状态
     this.loaded = false;
     this.loading = false;
+    this._loadingPromise = null; // 加载 Promise，用于避免重复加载
     this.svgItem = null;
     this.svgContent = null;
     this._loadedCallbackCalled = false; // 标记 loaded 回调是否已调用
+    this._svgInitialScaleApplied = false; // 标记 SVG 初始缩放是否已应用
     
     // 尺寸和位置
     this.width = config.width || 100;
@@ -49,35 +51,47 @@ export class SVGElement extends BaseElement {
    * 加载 SVG 文件或字符串
    */
   async load() {
-    if (this.loaded || this.loading) {
+    if (this.loaded && this.svgContent) {
       return;
     }
 
-    this.loading = true;
-
-    try {
-      // 如果提供了 SVG 字符串，直接使用
-      if (this.svgString) {
-        this.svgContent = this.svgString;
-      } else if (this.src) {
-        // 从文件加载
-        const svgPath = path.isAbsolute(this.src) ? this.src : path.resolve(this.src);
-        if (await fs.pathExists(svgPath)) {
-          this.svgContent = await fs.readFile(svgPath, 'utf-8');
-        } else {
-          throw new Error(`SVG 文件不存在: ${svgPath}`);
-        }
-      } else {
-        throw new Error('SVG 元素需要提供 src 或 svgString');
-      }
-
-      this.loaded = true;
-      this.loading = false;
-    } catch (error) {
-      this.loading = false;
-      console.error('[SVGElement] 加载 SVG 失败:', error);
-      throw error;
+    // 如果正在加载，返回现有的 Promise
+    if (this.loading && this._loadingPromise) {
+      return this._loadingPromise;
     }
+
+    this.loading = true;
+    
+    // 创建加载 Promise
+    this._loadingPromise = (async () => {
+      try {
+        // 如果提供了 SVG 字符串，直接使用
+        if (this.svgString) {
+          this.svgContent = this.svgString;
+        } else if (this.src) {
+          // 从文件加载
+          const svgPath = path.isAbsolute(this.src) ? this.src : path.resolve(this.src);
+          if (await fs.pathExists(svgPath)) {
+            this.svgContent = await fs.readFile(svgPath, 'utf-8');
+          } else {
+            throw new Error(`SVG 文件不存在: ${svgPath}`);
+          }
+        } else {
+          throw new Error('SVG 元素需要提供 src 或 svgString');
+        }
+
+        this.loaded = true;
+        this.loading = false;
+        this._loadingPromise = null;
+      } catch (error) {
+        this.loading = false;
+        this._loadingPromise = null;
+        console.error('[SVGElement] 加载 SVG 失败:', error);
+        throw error;
+      }
+    })();
+
+    return this._loadingPromise;
   }
 
   /**
@@ -88,12 +102,22 @@ export class SVGElement extends BaseElement {
   }
 
   /**
-   * 初始化 SVG（同步方式，在渲染时调用）
+   * 初始化 SVG（统一使用 initialize 方法）
    */
   async initialize() {
-    if (!this.loaded) {
-      await this.load();
+    // 如果已经加载，直接返回
+    if (this.loaded && this.svgContent) {
+      return;
     }
+    
+    // 如果正在加载，等待加载完成
+    if (this.loading && this._loadingPromise) {
+      await this._loadingPromise;
+      return;
+    }
+    
+    // 开始加载
+    await this.load();
   }
 
   /**
@@ -108,11 +132,12 @@ export class SVGElement extends BaseElement {
     }
 
     // 如果还没加载，尝试加载
-    if (!this.loaded) {
+    if (!this.loaded || !this.svgContent) {
       await this.initialize();
     }
 
     if (!this.svgContent) {
+      console.warn(`[SVGElement] SVG 内容为空，无法渲染。loaded: ${this.loaded}, svgString: ${!!this.svgString}, src: ${this.src}`);
       return null;
     }
 
@@ -149,17 +174,36 @@ export class SVGElement extends BaseElement {
     const rectY = y - height * anchor[1];
 
     try {
-      // 使用缓存的 svgItem，避免每次重新导入
-      let svgItem = this.svgItem;
+      // 检查 paper.project 是否可用
+      if (!paper.project) {
+        console.warn('[SVGElement] paper.project 不可用');
+        return null;
+      }
       
-      // 如果还没有导入 SVG，则导入
-      if (!svgItem) {
+      // 检查缓存的 svgItem 是否仍然有效（属于当前的 project）
+      let svgItem = this.svgItem;
+      const isItemValid = svgItem && svgItem.project === paper.project && svgItem.parent;
+      
+      // 如果 svgItem 无效或不存在，需要重新导入
+      if (!isItemValid) {
+        // 如果 svgItem 存在但不属于当前 project，清除它
+        if (svgItem && svgItem.project !== paper.project) {
+          this.svgItem = null;
+          svgItem = null;
+        }
+        
         // 尝试导入 SVG
         if (typeof paper.project.importSVG === 'function') {
-          // 方法1：直接导入 SVG 字符串
-          svgItem = paper.project.importSVG(this.svgContent, {
-            expandShapes: true,
-          });
+          try {
+            // 方法1：直接导入 SVG 字符串
+            svgItem = paper.project.importSVG(this.svgContent, {
+              expandShapes: true,
+            });
+          } catch (importError) {
+            console.error('[SVGElement] SVG 导入失败:', importError);
+            console.error('[SVGElement] SVG 内容长度:', this.svgContent?.length);
+            return null;
+          }
         } else {
           // 如果 importSVG 不可用，尝试其他方法
           console.warn('[SVGElement] paper.project.importSVG 不可用，尝试使用其他方法');
@@ -167,28 +211,31 @@ export class SVGElement extends BaseElement {
         }
 
         if (!svgItem) {
-          console.warn('[SVGElement] SVG 导入失败');
+          console.warn('[SVGElement] SVG 导入失败，svgItem 为 null');
           return null;
         }
 
         // 保存引用
         this.svgItem = svgItem;
         
-      // 如果是第一次渲染，调用 loaded 回调
-      if (this.onLoaded && !this._loadedCallbackCalled) {
-        try {
-          // loaded 回调：第一个参数是 svgElement，第二个参数是 time
-          this.onLoaded(this, time);
-          this._loadedCallbackCalled = true;
-        } catch (e) {
-          console.warn('[SVGElement] loaded 回调执行失败:', e);
+        // 如果是第一次渲染，调用 loaded 回调
+        if (this.onLoaded && !this._loadedCallbackCalled) {
+          try {
+            // loaded 回调：第一个参数是 svgElement，第二个参数是 time
+            this.onLoaded(this, time);
+            this._loadedCallbackCalled = true;
+          } catch (e) {
+            console.warn('[SVGElement] loaded 回调执行失败:', e);
+          }
         }
-      }
         
         // 缓存 SVG 内部元素（如果已配置动画）
         if (this.elementAnimations.size > 0) {
           this._cacheElements(svgItem);
         }
+        
+        // 重置缩放标志，因为这是新的 item
+        this._svgInitialScaleApplied = false;
       }
 
       // 获取 SVG 的原始尺寸（使用缓存的或重新计算）
@@ -600,6 +647,7 @@ export class SVGElement extends BaseElement {
     this.svgContent = null;
     this.loaded = false;
     this.loading = false;
+    this._loadingPromise = null;
     this._loadedCallbackCalled = false;
     this.elementAnimations.clear();
     this.cachedElements.clear();

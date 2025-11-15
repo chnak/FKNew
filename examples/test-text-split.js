@@ -98,8 +98,8 @@ async function testTextSplit() {
       startTime: 0,
       fontFamily: 'Arial',
       fontWeight: 'bold',
-      split: 'letter',
-      splitDelay: 0.1,
+      // split: 'letter',
+      // splitDelay: 0.1,
       animations: ['fadeIn'],
       textShadow: true,
       textShadowColor: '#000000',
@@ -118,7 +118,7 @@ async function testTextSplit() {
       fontFamily: 'Arial',
       split: 'word',
       splitDelay: 0.2,
-      animations: ['slideInLeft'],
+      //animations: ['slideInLeft'],
     });
 
   mainTrack.addTransition({
@@ -129,264 +129,264 @@ async function testTextSplit() {
 
   currentTime = scene2StartTime + sceneDuration;
 
-  // ========== 场景3：中英文混合 ==========
-  console.log('创建场景3: 中英文混合...');
-  const scene3StartTime = currentTime - transitionDuration;
-  const scene3 = mainTrack.createScene({
-    duration: sceneDuration,
-    startTime: scene3StartTime,
-  })
-    .addBackground({ color: '#1a1a2e' })
-    .addText({
-      text: 'FKNew 视频生成库',
-      x: '50%',
-      y: '40%',
-      fontSize: 100,
-      color: '#4ECDC4',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
-      fontWeight: 'bold',
-      split: 'letter',
-      splitDelay: 0.1,
-      animations: ['fadeIn'],
-      textShadow: true,
-      textShadowColor: '#000000',
-      textShadowBlur: 20,
-    })
-    .addText({
-      text: 'Programmatic Video Generation',
-      x: '50%',
-      y: '60%',
-      fontSize: 60,
-      color: '#FFD700',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 1,
-      fontFamily: 'Arial',
-      split: 'word',
-      splitDelay: 0.15,
-      animations: ['bounceIn'],
-    });
+  // // ========== 场景3：中英文混合 ==========
+  // console.log('创建场景3: 中英文混合...');
+  // const scene3StartTime = currentTime - transitionDuration;
+  // const scene3 = mainTrack.createScene({
+  //   duration: sceneDuration,
+  //   startTime: scene3StartTime,
+  // })
+  //   .addBackground({ color: '#1a1a2e' })
+  //   .addText({
+  //     text: 'FKNew 视频生成库',
+  //     x: '50%',
+  //     y: '40%',
+  //     fontSize: 100,
+  //     color: '#4ECDC4',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 0,
+  //     fontFamily: 'MicrosoftYaHei',
+  //     fontWeight: 'bold',
+  //     split: 'letter',
+  //     splitDelay: 0.1,
+  //     animations: ['fadeIn'],
+  //     textShadow: true,
+  //     textShadowColor: '#000000',
+  //     textShadowBlur: 20,
+  //   })
+  //   .addText({
+  //     text: 'Programmatic Video Generation',
+  //     x: '50%',
+  //     y: '60%',
+  //     fontSize: 60,
+  //     color: '#FFD700',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 1,
+  //     fontFamily: 'Arial',
+  //     split: 'word',
+  //     splitDelay: 0.15,
+  //     animations: ['bounceIn'],
+  //   });
 
-  mainTrack.addTransition({
-    name: 'CrossZoom',
-    duration: transitionDuration,
-    startTime: scene3StartTime,
-  });
+  // mainTrack.addTransition({
+  //   name: 'CrossZoom',
+  //   duration: transitionDuration,
+  //   startTime: scene3StartTime,
+  // });
 
-  currentTime = scene3StartTime + sceneDuration;
+  // currentTime = scene3StartTime + sceneDuration;
 
-  // ========== 场景4：包含符号 ==========
-  console.log('创建场景4: 包含符号...');
-  const scene4StartTime = currentTime - transitionDuration;
-  const scene4 = mainTrack.createScene({
-    duration: sceneDuration,
-    startTime: scene4StartTime,
-  })
-    .addBackground({ color: '#2d3436' })
-    .addText({
-      text: 'Hello, World!',
-      x: '50%',
-      y: '35%',
-      fontSize: 100,
-      color: '#ff6b6b',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 0,
-      fontFamily: 'Arial',
-      fontWeight: 'bold',
-      split: 'letter',
-      splitDelay: 0.1,
-      animations: ['fadeIn'],
-      textShadow: true,
-      textShadowColor: '#000000',
-      textShadowBlur: 15,
-    })
-    .addText({
-      text: '价格：¥99.99 / $19.99',
-      x: '50%',
-      y: '55%',
-      fontSize: 80,
-      color: '#4ECDC4',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 0.5,
-      fontFamily: 'MicrosoftYaHei',
-      split: 'letter',
-      splitDelay: 0.1,
-      animations: ['fadeIn'],
-    })
-    .addText({
-      text: 'Email: test@example.com',
-      x: '50%',
-      y: '75%',
-      fontSize: 70,
-      color: '#a29bfe',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 1,
-      fontFamily: 'Arial',
-      split: 'letter',
-      splitDelay: 0.08,
-      animations: ['fadeIn'],
-    });
+  // // ========== 场景4：包含符号 ==========
+  // console.log('创建场景4: 包含符号...');
+  // const scene4StartTime = currentTime - transitionDuration;
+  // const scene4 = mainTrack.createScene({
+  //   duration: sceneDuration,
+  //   startTime: scene4StartTime,
+  // })
+  //   .addBackground({ color: '#2d3436' })
+  //   .addText({
+  //     text: 'Hello, World!',
+  //     x: '50%',
+  //     y: '35%',
+  //     fontSize: 100,
+  //     color: '#ff6b6b',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 0,
+  //     fontFamily: 'Arial',
+  //     fontWeight: 'bold',
+  //     split: 'letter',
+  //     splitDelay: 0.1,
+  //     animations: ['fadeIn'],
+  //     textShadow: true,
+  //     textShadowColor: '#000000',
+  //     textShadowBlur: 15,
+  //   })
+  //   .addText({
+  //     text: '价格：¥99.99 / $19.99',
+  //     x: '50%',
+  //     y: '55%',
+  //     fontSize: 80,
+  //     color: '#4ECDC4',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 0.5,
+  //     fontFamily: 'MicrosoftYaHei',
+  //     split: 'letter',
+  //     splitDelay: 0.1,
+  //     animations: ['fadeIn'],
+  //   })
+  //   .addText({
+  //     text: 'Email: test@example.com',
+  //     x: '50%',
+  //     y: '75%',
+  //     fontSize: 70,
+  //     color: '#a29bfe',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 1,
+  //     fontFamily: 'Arial',
+  //     split: 'letter',
+  //     splitDelay: 0.08,
+  //     animations: ['fadeIn'],
+  //   });
 
-  mainTrack.addTransition({
-    name: 'Swirl',
-    duration: transitionDuration,
-    startTime: scene4StartTime,
-  });
+  // mainTrack.addTransition({
+  //   name: 'Swirl',
+  //   duration: transitionDuration,
+  //   startTime: scene4StartTime,
+  // });
 
-  currentTime = scene4StartTime + sceneDuration;
+  // currentTime = scene4StartTime + sceneDuration;
 
-  // ========== 场景5：包含空格 ==========
-  console.log('创建场景5: 包含空格...');
-  const scene5StartTime = currentTime - transitionDuration;
-  const scene5 = mainTrack.createScene({
-    duration: sceneDuration,
-    startTime: scene5StartTime,
-  })
-    .addBackground({ color: '#1a1a2e' })
-    .addText({
-      text: 'Hello   World', // 多个空格
-      x: '50%',
-      y: '40%',
-      fontSize: 100,
-      color: '#FFD700',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 0,
-      fontFamily: 'Arial',
-      fontWeight: 'bold',
-      split: 'letter',
-      splitDelay: 0.1,
-      animations: ['fadeIn'],
-      textShadow: true,
-      textShadowColor: '#000000',
-      textShadowBlur: 15,
-    })
-    .addText({
-      text: '中 文 测 试', // 中文字符之间有空格
-      x: '50%',
-      y: '60%',
-      fontSize: 90,
-      color: '#4ECDC4',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 1,
-      fontFamily: 'MicrosoftYaHei',
-      split: 'letter',
-      splitDelay: 0.12,
-      animations: ['bounceIn'],
-    });
+  // // ========== 场景5：包含空格 ==========
+  // console.log('创建场景5: 包含空格...');
+  // const scene5StartTime = currentTime - transitionDuration;
+  // const scene5 = mainTrack.createScene({
+  //   duration: sceneDuration,
+  //   startTime: scene5StartTime,
+  // })
+  //   .addBackground({ color: '#1a1a2e' })
+  //   .addText({
+  //     text: 'Hello   World', // 多个空格
+  //     x: '50%',
+  //     y: '40%',
+  //     fontSize: 100,
+  //     color: '#FFD700',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 0,
+  //     fontFamily: 'Arial',
+  //     fontWeight: 'bold',
+  //     split: 'letter',
+  //     splitDelay: 0.1,
+  //     animations: ['fadeIn'],
+  //     textShadow: true,
+  //     textShadowColor: '#000000',
+  //     textShadowBlur: 15,
+  //   })
+  //   .addText({
+  //     text: '中 文 测 试', // 中文字符之间有空格
+  //     x: '50%',
+  //     y: '60%',
+  //     fontSize: 90,
+  //     color: '#4ECDC4',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 1,
+  //     fontFamily: 'MicrosoftYaHei',
+  //     split: 'letter',
+  //     splitDelay: 0.12,
+  //     animations: ['bounceIn'],
+  //   });
 
-  mainTrack.addTransition({
-    name: 'Bounce',
-    duration: transitionDuration,
-    startTime: scene5StartTime,
-  });
+  // mainTrack.addTransition({
+  //   name: 'Bounce',
+  //   duration: transitionDuration,
+  //   startTime: scene5StartTime,
+  // });
 
-  currentTime = scene5StartTime + sceneDuration;
+  // currentTime = scene5StartTime + sceneDuration;
 
-  // ========== 场景6：多行文本 ==========
-  console.log('创建场景6: 多行文本...');
-  const scene6StartTime = currentTime - transitionDuration;
-  const scene6 = mainTrack.createScene({
-    duration: sceneDuration,
-    startTime: scene6StartTime,
-  })
-    .addBackground({ color: '#2d3436' })
-    .addText({
-      text: '第一行\n第二行\n第三行',
-      x: '50%',
-      y: '50%',
-      fontSize: 80,
-      color: '#74b9ff',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
-      fontWeight: 'bold',
-      split: 'line',
-      splitDelay: 0.3,
-      animations: ['fadeIn'],
-      textShadow: true,
-      textShadowColor: '#000000',
-      textShadowBlur: 20,
-    });
+  // // ========== 场景6：多行文本 ==========
+  // console.log('创建场景6: 多行文本...');
+  // const scene6StartTime = currentTime - transitionDuration;
+  // const scene6 = mainTrack.createScene({
+  //   duration: sceneDuration,
+  //   startTime: scene6StartTime,
+  // })
+  //   .addBackground({ color: '#2d3436' })
+  //   .addText({
+  //     text: '第一行\n第二行\n第三行',
+  //     x: '50%',
+  //     y: '50%',
+  //     fontSize: 80,
+  //     color: '#74b9ff',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 0,
+  //     fontFamily: 'MicrosoftYaHei',
+  //     fontWeight: 'bold',
+  //     split: 'line',
+  //     splitDelay: 0.3,
+  //     animations: ['fadeIn'],
+  //     textShadow: true,
+  //     textShadowColor: '#000000',
+  //     textShadowBlur: 20,
+  //   });
 
-  mainTrack.addTransition({
-    name: 'Dreamy',
-    duration: transitionDuration,
-    startTime: scene6StartTime,
-  });
+  // mainTrack.addTransition({
+  //   name: 'Dreamy',
+  //   duration: transitionDuration,
+  //   startTime: scene6StartTime,
+  // });
 
-  currentTime = scene6StartTime + sceneDuration;
+  // currentTime = scene6StartTime + sceneDuration;
 
-  // ========== 场景7：复杂混合 ==========
-  console.log('创建场景7: 复杂混合（中文+英文+符号+空格）...');
-  const scene7StartTime = currentTime - transitionDuration;
-  const scene7 = mainTrack.createScene({
-    duration: sceneDuration,
-    startTime: scene7StartTime,
-  })
-    .addBackground({ color: '#1a1a2e' })
-    .addText({
-      text: 'FKNew v1.0.0 - 程序化视频生成库',
-      x: '50%',
-      y: '40%',
-      fontSize: 85,
-      color: '#4ECDC4',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
-      fontWeight: 'bold',
-      split: 'letter',
-      splitDelay: 0.08,
-      animations: ['fadeIn'],
-      textShadow: true,
-      textShadowColor: '#000000',
-      textShadowBlur: 20,
-      stroke: true,
-      strokeColor: '#FFFFFF',
-      strokeWidth: 2,
-    })
-    .addText({
-      text: '支持：中文、English、符号!@#$%',
-      x: '50%',
-      y: '60%',
-      fontSize: 70,
-      color: '#FFD700',
-      textAlign: 'center',
-      anchor: [0.5, 0.5],
-      duration: sceneDuration,
-      startTime: 0.8,
-      fontFamily: 'MicrosoftYaHei',
-      split: 'letter',
-      splitDelay: 0.08,
-      animations: ['bounceIn'],
-      gradient: true,
-      gradientColors: ['#FFD700', '#FF6B6B'],
-      gradientDirection: 'horizontal',
-    });
+  // // ========== 场景7：复杂混合 ==========
+  // console.log('创建场景7: 复杂混合（中文+英文+符号+空格）...');
+  // const scene7StartTime = currentTime - transitionDuration;
+  // const scene7 = mainTrack.createScene({
+  //   duration: sceneDuration,
+  //   startTime: scene7StartTime,
+  // })
+  //   .addBackground({ color: '#1a1a2e' })
+  //   .addText({
+  //     text: 'FKNew v1.0.0 - 程序化视频生成库',
+  //     x: '50%',
+  //     y: '40%',
+  //     fontSize: 85,
+  //     color: '#4ECDC4',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 0,
+  //     fontFamily: 'MicrosoftYaHei',
+  //     fontWeight: 'bold',
+  //     split: 'letter',
+  //     splitDelay: 0.08,
+  //     animations: ['fadeIn'],
+  //     textShadow: true,
+  //     textShadowColor: '#000000',
+  //     textShadowBlur: 20,
+  //     stroke: true,
+  //     strokeColor: '#FFFFFF',
+  //     strokeWidth: 2,
+  //   })
+  //   .addText({
+  //     text: '支持：中文、English、符号!@#$%',
+  //     x: '50%',
+  //     y: '60%',
+  //     fontSize: 70,
+  //     color: '#FFD700',
+  //     textAlign: 'center',
+  //     anchor: [0.5, 0.5],
+  //     duration: sceneDuration,
+  //     startTime: 0.8,
+  //     fontFamily: 'MicrosoftYaHei',
+  //     split: 'letter',
+  //     splitDelay: 0.08,
+  //     animations: ['bounceIn'],
+  //     gradient: true,
+  //     gradientColors: ['#FFD700', '#FF6B6B'],
+  //     gradientDirection: 'horizontal',
+  //   });
 
-  mainTrack.addTransition({
-    name: 'Radial',
-    duration: transitionDuration,
-    startTime: scene7StartTime,
-  });
+  // mainTrack.addTransition({
+  //   name: 'Radial',
+  //   duration: transitionDuration,
+  //   startTime: scene7StartTime,
+  // });
 
   // 导出视频
   const outputPath = path.join(outputDir, 'test-text-split.mp4');
