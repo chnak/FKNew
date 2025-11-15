@@ -331,7 +331,11 @@ export class VideoExporter {
     if (transitions.length > 0) {
       console.log(`检测到 ${transitions.length} 个转场:`);
       transitions.forEach((t, i) => {
-        console.log(`  转场 ${i + 1}: ${t.name}, 时间范围: ${t.startTime.toFixed(3)}s - ${t.endTime.toFixed(3)}s, 时长: ${t.duration.toFixed(3)}s`);
+        // 确保 startTime 和 endTime 存在且正确
+        const startTime = t.startTime !== undefined ? t.startTime : 0;
+        const endTime = t.endTime !== undefined ? t.endTime : (startTime + (t.duration || 0));
+        const duration = t.duration || 0;
+        console.log(`  转场 ${i + 1}: ${t.name}, 时间范围: ${startTime.toFixed(3)}s - ${endTime.toFixed(3)}s, 时长: ${duration.toFixed(3)}s`);
       });
     } else {
       console.log('未检测到转场');

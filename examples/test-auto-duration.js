@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 async function testAutoDuration() {
   console.log('🧪 测试自动检测音频时长功能...\n');
 
-  const name = "帝女芳魂";
+  const name = "彩云追月";
   const audioFile = path.join(__dirname, `../assets/${name}.mp3`);
   const lrcFile = path.join(__dirname, `../assets/${name}.lrc`);
 
@@ -116,10 +116,10 @@ async function testAutoDuration() {
     split: 'letter',
     minDuration: 1,
     maxDuration: 5,
-    animations: [
-      { type: 'fadeIn', duration: 0.3 },
-      { type: 'fadeOut', duration: 0.3 },
-    ],
+    gradient: true,
+    gradientColors: ['#FF6B6B', '#4ECDC4', '#45B7D1'],
+    gradientDirection: 'horizontal',
+    animations: ['bigIn'],
   });
 
   const outputDir = path.join(__dirname, '../output');

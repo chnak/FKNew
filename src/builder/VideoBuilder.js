@@ -119,39 +119,49 @@ export class VideoBuilder {
             }
           } else {
             // 转场有指定的startTime，查找对应的场景
-            for (let j = 0; j < sortedScenes.length - 1; j++) {
+            // transition.startTime 是转场结束的时间点（目标场景开始的时间）
+            for (let j = 0; j < sortedScenes.length; j++) {
               const scene = sortedScenes[j];
-              const nextScene = sortedScenes[j + 1];
-              const sceneEndTime = (scene.startTime || 0) + scene.duration;
-              const nextSceneStartTime = nextScene.startTime !== undefined ? nextScene.startTime : sceneEndTime;
+              const sceneStartTime = scene.startTime !== undefined ? scene.startTime : 0;
               
-              // 转场开始时间应该等于下一个场景的开始时间
-              if (Math.abs(transitionStartTime - nextSceneStartTime) < 0.01) {
-                fromScene = scene;
-                toScene = nextScene;
-                break;
+              // 转场结束时间应该等于目标场景的开始时间
+              if (Math.abs(transitionStartTime - sceneStartTime) < 0.01) {
+                // 找到目标场景，查找源场景（前一个场景）
+                if (j > 0) {
+                  fromScene = sortedScenes[j - 1];
+                  toScene = scene;
+                  break;
+                }
               }
             }
           }
           
           if (fromScene && toScene && transitionStartTime !== undefined) {
-            // 转场应该在两个场景之间各占一半
-            // 例如：场景1结束时间是3秒，场景2开始时间是3秒，转场时长1秒
-            // 转场应该从2.5秒开始（场景1结束前0.5秒），到3.5秒结束（场景2开始后0.5秒）
-            const fromSceneEndTime = (fromScene.startTime || 0) + fromScene.duration;
-            const toSceneStartTime = transitionStartTime;
-            const halfDuration = transition.duration / 2;
+            // 转场时间计算：
+            // transition.startTime 是转场结束的时间点（目标场景开始的时间）
+            // 转场开始时间 = transitionStartTime - duration
+            // 转场结束时间 = transitionStartTime
+            const transitionDuration = transition.duration || 0.5;
+            const transitionActualStartTime = transitionStartTime - transitionDuration;
+            const transitionActualEndTime = transitionStartTime;
             
-            allTransitions.push({
+            // 确保计算正确
+            if (transitionActualStartTime >= transitionActualEndTime) {
+              console.warn(`转场 ${transition.name} 时间计算错误: startTime=${transitionActualStartTime}, endTime=${transitionActualEndTime}, transitionStartTime=${transitionStartTime}, duration=${transitionDuration}`);
+            }
+            
+            const transitionObj = {
               name: transition.name,
-              duration: transition.duration,
-              startTime: fromSceneEndTime - halfDuration, // 转场开始时间（场景1结束前一半）
-              endTime: toSceneStartTime + halfDuration, // 转场结束时间（场景2开始后一半）
+              duration: transitionDuration,
+              startTime: transitionActualStartTime, // 转场开始时间
+              endTime: transitionActualEndTime, // 转场结束时间（目标场景开始时间）
               easing: transition.easing,
               params: transition.params,
               fromScene: fromScene,
               toScene: toScene,
-            });
+            };
+            
+            allTransitions.push(transitionObj);
           } else {
             console.warn(`转场 ${transition.name} 无法找到对应的场景，startTime: ${transitionStartTime}, fromScene: ${fromScene}, toScene: ${toScene}`);
           }
@@ -173,8 +183,13 @@ export class VideoBuilder {
    */
   async export(outputPath, options = {}) {
     const composition = this.build();
-    await composition.export(outputPath, options);
-    composition.destroy();
+    try {
+      await composition.export(outputPath, options);
+    } finally {
+      composition.destroy();
+      // 导出完成后自动销毁 builder
+      this.destroy();
+    }
   }
 
   /**

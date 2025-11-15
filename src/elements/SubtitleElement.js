@@ -37,6 +37,51 @@ export class SubtitleElement extends BaseElement {
     // 字幕分割相关
     this.maxLength = config.maxLength || 20; // 每段最大字符数
     
+    // 文本效果相关配置（传递给子 TextElement）
+    // 描边效果
+    this.stroke = config.stroke;
+    this.strokeColor = config.strokeColor;
+    this.strokeWidth = config.strokeWidth;
+    this.strokeStyle = config.strokeStyle;
+    this.strokeDashArray = config.strokeDashArray;
+    this.strokeDashOffset = config.strokeDashOffset;
+    this.strokeCap = config.strokeCap;
+    this.strokeJoin = config.strokeJoin;
+    this.strokeMiterLimit = config.strokeMiterLimit;
+    
+    // 文本阴影效果
+    this.textShadow = config.textShadow;
+    this.textShadowColor = config.textShadowColor;
+    this.textShadowOffsetX = config.textShadowOffsetX;
+    this.textShadowOffsetY = config.textShadowOffsetY;
+    this.textShadowBlur = config.textShadowBlur;
+    this.textShadowOpacity = config.textShadowOpacity;
+    this.textShadowStyle = config.textShadowStyle;
+    this.textShadowSpread = config.textShadowSpread;
+    
+    // 文本渐变效果
+    this.gradient = config.gradient;
+    this.gradientColors = config.gradientColors;
+    this.gradientDirection = config.gradientDirection;
+    
+    // 文本发光效果
+    this.textGlow = config.textGlow;
+    this.textGlowColor = config.textGlowColor;
+    this.textGlowBlur = config.textGlowBlur;
+    this.textGlowIntensity = config.textGlowIntensity;
+    
+    // 文本背景
+    this.textBackground = config.textBackground;
+    this.textBackgroundColor = config.textBackgroundColor;
+    this.textBackgroundPadding = config.textBackgroundPadding;
+    this.textBackgroundRadius = config.textBackgroundRadius;
+    
+    // 其他文本属性
+    this.fontWeight = config.fontWeight;
+    this.fontStyle = config.fontStyle;
+    this.lineHeight = config.lineHeight;
+    this.textBaseline = config.textBaseline;
+    
     // 存储分割后的 TextElement 列表
     this.textElements = [];
     this.initialized = false;
@@ -108,6 +153,45 @@ export class SubtitleElement extends BaseElement {
         rotation: this.config.rotation || 0,
         scaleX: this.config.scaleX || 1,
         scaleY: this.config.scaleY || 1,
+        // 文本效果配置
+        // 描边效果
+        stroke: this.stroke,
+        strokeColor: this.strokeColor,
+        strokeWidth: this.strokeWidth,
+        strokeStyle: this.strokeStyle,
+        strokeDashArray: this.strokeDashArray,
+        strokeDashOffset: this.strokeDashOffset,
+        strokeCap: this.strokeCap,
+        strokeJoin: this.strokeJoin,
+        strokeMiterLimit: this.strokeMiterLimit,
+        // 文本阴影效果
+        textShadow: this.textShadow,
+        textShadowColor: this.textShadowColor,
+        textShadowOffsetX: this.textShadowOffsetX,
+        textShadowOffsetY: this.textShadowOffsetY,
+        textShadowBlur: this.textShadowBlur,
+        textShadowOpacity: this.textShadowOpacity,
+        textShadowStyle: this.textShadowStyle,
+        textShadowSpread: this.textShadowSpread,
+        // 文本渐变效果
+        gradient: this.gradient,
+        gradientColors: this.gradientColors,
+        gradientDirection: this.gradientDirection,
+        // 文本发光效果
+        textGlow: this.textGlow,
+        textGlowColor: this.textGlowColor,
+        textGlowBlur: this.textGlowBlur,
+        textGlowIntensity: this.textGlowIntensity,
+        // 文本背景
+        textBackground: this.textBackground,
+        textBackgroundColor: this.textBackgroundColor,
+        textBackgroundPadding: this.textBackgroundPadding,
+        textBackgroundRadius: this.textBackgroundRadius,
+        // 其他文本属性
+        fontWeight: this.fontWeight,
+        fontStyle: this.fontStyle,
+        lineHeight: this.lineHeight,
+        textBaseline: this.textBaseline,
       });
       
       this.textElements.push(textElement);
