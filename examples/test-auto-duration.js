@@ -61,7 +61,7 @@ async function testAutoDuration() {
     // 背景使用深灰蓝色
     .addBackground({ color: colors.charcoal })
     
-    // 添加装饰性圆形背景（左上角）
+    // 添加装饰性圆形背景（左上角）- 优化：在onFrame中添加持续旋转和脉冲效果
     .addCircle({
       x: '10%',
       y: '10%',
@@ -76,9 +76,21 @@ async function testAutoDuration() {
         { type: 'fade', fromOpacity: 0.2, toOpacity: 0.4, duration: audioDurationNum / 2 },
         { type: 'fade', fromOpacity: 0.4, toOpacity: 0.2, duration: audioDurationNum / 2, delay: audioDurationNum / 2 },
       ],
+      // 持续旋转动画（每帧更新）
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        // 持续旋转：每秒旋转180度
+        const rotationSpeed = 180; // 度/秒
+        const rotation = (event.time * rotationSpeed) % 360;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot) {
+          const currentRotation = paperItem.rotation || 0;
+          paperItem.rotate(rotation - currentRotation, pivot);
+        }
+      },
     })
     
-    // 添加装饰性圆形背景（右下角）
+    // 添加装饰性圆形背景（右下角）- 优化：在onFrame中添加反向旋转和持续脉冲
     .addCircle({
       x: '90%',
       y: '90%',
@@ -93,9 +105,28 @@ async function testAutoDuration() {
         { type: 'fade', fromOpacity: 0.15, toOpacity: 0.3, duration: audioDurationNum / 2 },
         { type: 'fade', fromOpacity: 0.3, toOpacity: 0.15, duration: audioDurationNum / 2, delay: audioDurationNum / 2 },
       ],
+      // 持续反向旋转和脉冲动画
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot) {
+          // 反向旋转：每秒旋转-120度
+          const rotationSpeed = -120; // 度/秒（负数为反向）
+          const rotation = (event.time * rotationSpeed) % 360;
+          const currentRotation = paperItem.rotation || 0;
+          paperItem.rotate(rotation - currentRotation, pivot);
+          
+          // 持续脉冲：使用正弦波实现呼吸效果
+          const pulseSpeed = 2; // 脉冲速度（周期/秒）
+          const pulsePhase = event.time * pulseSpeed * 2 * Math.PI;
+          const pulseScale = 1 + Math.sin(pulsePhase) * 0.1; // 在1.0到1.1之间变化
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(pulseScale / currentScale, pivot);
+        }
+      },
     })
     
-    // 添加装饰性矩形（顶部装饰条）
+    // 添加装饰性矩形（顶部装饰条）- 优化：添加宽度动画
     .addRect({
       x: '50%',
       y: '5%',
@@ -108,12 +139,13 @@ async function testAutoDuration() {
       zIndex: 2,
       animations: [
         { type: 'fade', fromOpacity: 0, toOpacity: 0.6, duration: 0.5 },
+        { type: 'transform', fromScaleX: 0, toScaleX: 1, duration: 0.8, easing: 'easeOut' },
         { type: 'fade', fromOpacity: 0.6, toOpacity: 0.3, duration: audioDurationNum - 1, delay: 0.5 },
         { type: 'fade', fromOpacity: 0.3, toOpacity: 0, duration: 0.5, delay: audioDurationNum - 0.5 },
       ],
     })
     
-    // 主标题 - 使用青蓝色，带渐变和阴影
+    // 主标题 - 使用青蓝色，带渐变和阴影 - 优化：在onFrame中添加持续呼吸效果
     .addText({
       text: name,
       color: colors.aquamarine,
@@ -138,16 +170,33 @@ async function testAutoDuration() {
       textShadowBlur: 20,
       textShadowOffsetX: 0,
       textShadowOffsetY: 4,
+      textGlow: true,
+      textGlowColor: colors.aquamarine,
+      textGlowBlur: 15,
       stroke: true,
       strokeColor: colors.royalBlue,
       strokeWidth: 2,
       animations: [
         { type: 'fade', fromOpacity: 0, toOpacity: 1, duration: 0.5 },
+        { type: 'transform', fromScaleX: 0.8, fromScaleY: 0.8, toScaleX: 1, toScaleY: 1, duration: 0.6, easing: 'easeOut' },
         { type: 'fade', fromOpacity: 1, toOpacity: 0, duration: 0.5, delay: audioDurationNum - 0.5 },
       ],
+      // 持续呼吸动画（轻微缩放）
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot) {
+          // 呼吸效果：在0.98到1.02之间轻微缩放
+          const breathSpeed = 1.5; // 呼吸速度（周期/秒）
+          const breathPhase = event.time * breathSpeed * 2 * Math.PI;
+          const breathScale = 1 + Math.sin(breathPhase) * 0.02;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(breathScale / currentScale, pivot);
+        }
+      },
     })
     
-    // 副标题 - 使用浅灰蓝色
+    // 副标题 - 使用浅灰蓝色 - 优化：添加滑动进入效果
     .addText({
       text: 'AUTOMATIC DURATION',
       color: colors.slate,
@@ -162,13 +211,17 @@ async function testAutoDuration() {
       fontFamily: 'Arial',
       fontWeight: 'normal',
       opacity: 0.8,
+      textShadow: true,
+      textShadowColor: colors.charcoal,
+      textShadowBlur: 10,
       animations: [
         { type: 'fade', fromOpacity: 0, toOpacity: 0.8, duration: 0.5 },
+        { type: 'move', fromY: '22%', toY: '22%', fromX: '-20%', toX: '50%', duration: 0.6, easing: 'easeOut' },
         { type: 'fade', fromOpacity: 0.8, toOpacity: 0, duration: 0.5, delay: audioDurationNum - 1 },
       ],
     });
 
-  // 添加示波器（音频可视化器）- 使用配色方案
+  // 添加示波器（音频可视化器）- 使用配色方案 - 优化：添加缩放进入效果
   scene.addOscilloscope({
     audioPath: audioFile,
     x: "50%",
@@ -176,7 +229,7 @@ async function testAutoDuration() {
     width: 650,
     height: 650,
     anchor: [0.5, 0.5],
-    backgroundColor: `${colors.royalBlue}40`, // 深蓝色半透明背景
+    backgroundColor: `${colors.royalBlue}60`, // 深蓝色半透明背景
     style: 'particles',
     mirror: true,
     sensitivity: 1.8,
@@ -198,11 +251,12 @@ async function testAutoDuration() {
     zIndex: 5,
     animations: [
       { type: 'fade', fromOpacity: 0, toOpacity: 1, duration: 0.8 },
+      { type: 'transform', fromScaleX: 0.7, fromScaleY: 0.7, toScaleX: 1, toScaleY: 1, duration: 0.8, easing: 'easeOut' },
       { type: 'fade', fromOpacity: 1, toOpacity: 0, duration: 0.8, delay: audioDurationNum - 0.8 },
     ],
   });
 
-  // 添加装饰性矩形边框（围绕示波器）
+  // 添加装饰性矩形边框（围绕示波器）- 优化：在onFrame中添加持续摆动和脉冲
   scene.addRect({
     x: '50%',
     y: '50%',
@@ -219,9 +273,30 @@ async function testAutoDuration() {
     borderRadius: 20,
     animations: [
       { type: 'fade', fromOpacity: 0, toOpacity: 0.5, duration: 0.5 },
+      { type: 'transform', fromScaleX: 0.9, fromScaleY: 0.9, toScaleX: 1, toScaleY: 1, duration: 0.8, easing: 'easeOut' },
       { type: 'fade', fromOpacity: 0.5, toOpacity: 0.3, duration: audioDurationNum - 1, delay: 0.5 },
       { type: 'fade', fromOpacity: 0.3, toOpacity: 0, duration: 0.5, delay: audioDurationNum - 0.5 },
     ],
+    // 持续摆动和脉冲动画
+    onFrame: (element, event, paperItem) => {
+      if (!paperItem) return;
+      const pivot = paperItem.position || paperItem.center;
+      if (pivot) {
+        // 轻微摆动：在-3度到3度之间摆动
+        const swingSpeed = 1; // 摆动速度（周期/秒）
+        const swingPhase = event.time * swingSpeed * 2 * Math.PI;
+        const swingRotation = Math.sin(swingPhase) * 3; // -3到3度
+        const currentRotation = paperItem.rotation || 0;
+        paperItem.rotate(swingRotation - currentRotation, pivot);
+        
+        // 轻微脉冲：在0.98到1.02之间缩放
+        const pulseSpeed = 1.2;
+        const pulsePhase = event.time * pulseSpeed * 2 * Math.PI;
+        const pulseScale = 1 + Math.sin(pulsePhase) * 0.02;
+        const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+        paperItem.scale(pulseScale / currentScale, pivot);
+      }
+    },
   });
 
   // 添加音频
@@ -232,8 +307,8 @@ async function testAutoDuration() {
     startTime: 0,
   });
 
-  // 添加 LRC 歌词 - 使用配色方案
-  await scene.addLRC(lrcFile, {
+  // 添加 LRC 歌词 - 使用配色方案 - 优化：启用所有文本效果
+  scene.addLRC(lrcFile, {
     textColor: colors.slate,
     fontSize: 42,
     x: '50%',
@@ -241,25 +316,15 @@ async function testAutoDuration() {
     textAlign: 'center',
     anchor: [0.5, 0.5],
     split: 'letter',
+    splitDelay: 0.05,
     minDuration: 1,
     maxDuration: 5,
     fontFamily: 'MicrosoftYaHei',
     fontWeight: 'normal',
-    gradient: true,
-    gradientColors: [colors.aquamarine, colors.royalBlue, colors.slate],
-    gradientDirection: 'horizontal',
-    textShadow: true,
-    textShadowColor: colors.royalBlue,
-    textShadowBlur: 15,
-    textShadowOffsetX: 0,
-    textShadowOffsetY: 2,
-    stroke: true,
-    strokeColor: colors.charcoal,
-    strokeWidth: 1,
     animations: ['bigIn'],
   });
   
-  // 添加底部装饰条
+  // 添加底部装饰条 - 优化：添加宽度动画
   scene.addRect({
     x: '50%',
     y: '95%',
@@ -272,12 +337,13 @@ async function testAutoDuration() {
     zIndex: 2,
     animations: [
       { type: 'fade', fromOpacity: 0, toOpacity: 0.5, duration: 0.5 },
+      { type: 'transform', fromScaleX: 0, toScaleX: 1, duration: 0.8, easing: 'easeOut' },
       { type: 'fade', fromOpacity: 0.5, toOpacity: 0.3, duration: audioDurationNum - 1, delay: 0.5 },
       { type: 'fade', fromOpacity: 0.3, toOpacity: 0, duration: 0.5, delay: audioDurationNum - 0.5 },
     ],
   });
   
-  // 添加装饰性路径（波浪线）- 使用配色方案
+  // 添加装饰性路径（波浪线）- 使用配色方案 - 优化：添加移动动画
   scene.addPath({
     points: [
       { x: 50, y: 200 },
@@ -301,12 +367,13 @@ async function testAutoDuration() {
     y: 0,
     animations: [
       { type: 'fade', fromOpacity: 0, toOpacity: 0.6, duration: 0.8 },
+      { type: 'move', fromX: -50, toX: 0, duration: 1, easing: 'easeOut' },
       { type: 'fade', fromOpacity: 0.6, toOpacity: 0.3, duration: audioDurationNum - 1.6, delay: 0.8 },
       { type: 'fade', fromOpacity: 0.3, toOpacity: 0, duration: 0.8, delay: audioDurationNum - 0.8 },
     ],
   });
   
-  // 添加装饰性路径（星形）- 使用配色方案
+  // 添加装饰性路径（星形）- 使用配色方案 - 优化：在onFrame中添加持续旋转和脉冲
   const starPoints = [];
   const centerX = 360; // 画布中心 X
   const centerY = 200; // 顶部区域
@@ -338,12 +405,31 @@ async function testAutoDuration() {
     y: 0,
     animations: [
       { type: 'fade', fromOpacity: 0, toOpacity: 0.4, duration: 0.5 },
-      { type: 'transform', fromRotation: 0, toRotation: 360, duration: audioDurationNum, easing: 'linear' },
+      { type: 'transform', fromScaleX: 0.5, fromScaleY: 0.5, toScaleX: 1, toScaleY: 1, duration: 0.6, easing: 'easeOut' },
       { type: 'fade', fromOpacity: 0.4, toOpacity: 0, duration: 0.5, delay: audioDurationNum - 0.5 },
     ],
+    // 持续旋转和脉冲动画
+    onFrame: (element, event, paperItem) => {
+      if (!paperItem) return;
+      const pivot = paperItem.position || paperItem.center;
+      if (pivot) {
+        // 快速旋转：每秒旋转360度（完整一圈）
+        const rotationSpeed = 360; // 度/秒
+        const rotation = (event.time * rotationSpeed) % 360;
+        const currentRotation = paperItem.rotation || 0;
+        paperItem.rotate(rotation - currentRotation, pivot);
+        
+        // 持续脉冲：在1.0到1.1之间缩放
+        const pulseSpeed = 2; // 脉冲速度（周期/秒）
+        const pulsePhase = event.time * pulseSpeed * 2 * Math.PI;
+        const pulseScale = 1 + (Math.sin(pulsePhase) + 1) * 0.05; // 1.0到1.1之间
+        const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+        paperItem.scale(pulseScale / currentScale, pivot);
+      }
+    },
   });
   
-  // 添加装饰性路径（曲线）- 使用配色方案
+  // 添加装饰性路径（曲线）- 使用配色方案 - 优化：添加从下往上滑入
   scene.addPath({
     points: [
       { x: 100, y: 1100 },
@@ -367,6 +453,7 @@ async function testAutoDuration() {
     dashArray: [10, 5],
     animations: [
       { type: 'fade', fromOpacity: 0, toOpacity: 0.5, duration: 0.6 },
+      { type: 'move', fromY: 1280, toY: 0, duration: 0.8, easing: 'easeOut' },
       { type: 'fade', fromOpacity: 0.5, toOpacity: 0.2, duration: audioDurationNum - 1.2, delay: 0.6 },
       { type: 'fade', fromOpacity: 0.2, toOpacity: 0, duration: 0.6, delay: audioDurationNum - 0.6 },
     ],
