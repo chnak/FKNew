@@ -1,7 +1,7 @@
 import { generateId } from '../utils/helpers.js';
 import { DEFAULT_ELEMENT_CONFIG } from '../types/constants.js';
 import { deepMerge } from '../utils/helpers.js';
-import { toPixels } from '../utils/unit-converter.js';
+import { toPixels, toFontSizePixels } from '../utils/unit-converter.js';
 import { TransformAnimation } from '../animations/TransformAnimation.js';
 import { KeyframeAnimation } from '../animations/KeyframeAnimation.js';
 import { AnimationType } from '../types/enums.js';
@@ -509,6 +509,172 @@ export class BaseElement {
     }
 
     return state;
+  }
+
+  /**
+   * 转换位置值（x, y）为像素值
+   * @param {string|number} x - X 坐标
+   * @param {string|number} y - Y 坐标
+   * @param {Object} context - 上下文对象 { width, height }
+   * @returns {{x: number, y: number}} 转换后的像素坐标
+   */
+  convertPosition(x, y, context = {}) {
+    const { width = 1920, height = 1080 } = context;
+    const unitContext = { width, height };
+    
+    return {
+      x: typeof x === 'string' ? toPixels(x, unitContext, 'x') : (x || 0),
+      y: typeof y === 'string' ? toPixels(y, unitContext, 'y') : (y || 0),
+    };
+  }
+
+  /**
+   * 转换尺寸值（width, height）为像素值
+   * @param {string|number} width - 宽度
+   * @param {string|number} height - 高度
+   * @param {Object} context - 上下文对象 { width, height }
+   * @returns {{width: number, height: number}} 转换后的像素尺寸
+   */
+  convertSize(width, height, context = {}) {
+    const { width: canvasWidth = 1920, height: canvasHeight = 1080 } = context;
+    const unitContext = { width: canvasWidth, height: canvasHeight };
+    
+    return {
+      width: typeof width === 'string' ? toPixels(width, unitContext, 'width') : (width || 0),
+      height: typeof height === 'string' ? toPixels(height, unitContext, 'height') : (height || 0),
+    };
+  }
+
+  /**
+   * 转换字体大小为像素值
+   * @param {string|number} fontSize - 字体大小
+   * @param {Object} context - 上下文对象 { width, height, baseFontSize }
+   * @param {number} defaultSize - 默认字体大小（如果转换失败）
+   * @returns {number} 转换后的像素值
+   */
+  convertFontSize(fontSize, context = {}, defaultSize = 24) {
+    if (!fontSize) return defaultSize;
+    
+    const { width = 1920, height = 1080, baseFontSize = 16 } = context;
+    const unitContext = { width, height, baseFontSize };
+    
+    const pixelSize = typeof fontSize === 'string' 
+      ? toFontSizePixels(fontSize, unitContext)
+      : fontSize;
+    
+    return pixelSize > 0 ? pixelSize : defaultSize;
+  }
+
+  /**
+   * 计算元素的最终位置（包括 anchor 对齐）
+   * @param {Object} state - 元素状态（从 getStateAtTime 获取，已转换单位）
+   * @param {Object} context - 上下文对象 { width, height }
+   * @param {Object} options - 选项
+   * @param {Array<number>} options.anchor - 锚点 [x, y]，默认使用 state.anchor
+   * @param {number} options.elementWidth - 元素宽度（用于 anchor 对齐），可选
+   * @param {number} options.elementHeight - 元素高度（用于 anchor 对齐），可选
+   * @returns {{x: number, y: number}} 最终位置（像素值）
+   */
+  calculatePosition(state, context = {}, options = {}) {
+    const anchor = options.anchor || state.anchor || [0.5, 0.5];
+    const { elementWidth, elementHeight } = options;
+    
+    // state.x 和 state.y 已经在 getStateAtTime 中转换了单位
+    let x = typeof state.x === 'number' ? state.x : (typeof state.x === 'string' ? toPixels(state.x, context, 'x') : 0);
+    let y = typeof state.y === 'number' ? state.y : (typeof state.y === 'string' ? toPixels(state.y, context, 'y') : 0);
+    
+    // 如果有元素尺寸，根据 anchor 调整位置
+    if (elementWidth !== undefined || elementHeight !== undefined) {
+      if (elementWidth !== undefined) {
+        x = x - (elementWidth * anchor[0]);
+      }
+      if (elementHeight !== undefined) {
+        y = y - (elementHeight * anchor[1]);
+      }
+    }
+    
+    return { x, y };
+  }
+
+  /**
+   * 计算分割文本片段的位置（特殊处理）
+   * @param {Object} state - 元素状态（从 getStateAtTime 获取）
+   * @param {Object} context - 上下文对象 { width, height }
+   * @param {Object} segmentConfig - 分割片段配置
+   * @returns {{x: number, y: number, baseline: string}} 最终位置和 baseline
+   */
+  calculateSegmentPosition(state, context = {}, segmentConfig = {}) {
+    const {
+      parentX,
+      parentY,
+      parentAnchor = [0.5, 0.5],
+      parentTextAlign = 'center',
+      totalTextWidth = 0,
+      totalTextHeight = 0,
+      segmentOffsetX = 0,
+      segmentOffsetY = 0,
+    } = segmentConfig;
+    
+    // 转换父元素位置单位
+    const { x: parentXPixels, y: parentYPixels } = this.convertPosition(parentX, parentY, context);
+    
+    // 计算文本基准位置（考虑 anchor 和 textAlign）
+    let baseX = parentXPixels;
+    let baseY = parentYPixels;
+    
+    // 根据 anchor 调整水平位置
+    if (parentAnchor[0] === 0.5) {
+      // 水平居中
+      if (parentTextAlign === 'center') {
+        baseX = baseX - totalTextWidth / 2;
+      } else if (parentTextAlign === 'right') {
+        baseX = baseX - totalTextWidth;
+      }
+    } else if (parentAnchor[0] === 1) {
+      // 右对齐
+      if (parentTextAlign === 'center') {
+        baseX = baseX - totalTextWidth / 2;
+      } else if (parentTextAlign === 'right') {
+        baseX = baseX - totalTextWidth;
+      }
+    }
+    
+    // 根据 anchor 调整垂直位置（segmentOffsetY 是相对于文本顶部的）
+    if (parentAnchor[1] === 0.5) {
+      // 垂直居中：baseY 应该指向文本顶部
+      baseY = baseY - totalTextHeight / 2;
+    } else if (parentAnchor[1] === 1) {
+      // 底部对齐：baseY 应该指向文本顶部
+      baseY = baseY - totalTextHeight;
+    }
+    // 顶部对齐：baseY 就是文本顶部，不需要调整
+    
+    // 计算动画偏移量（state.x 和 state.y 已经包含了动画偏移）
+    const { x: originalConfigX, y: originalConfigY } = this.convertPosition(
+      this.config.x || parentX,
+      this.config.y || parentY,
+      context
+    );
+    
+    const animatedX = (state.x !== undefined && typeof state.x === 'number') 
+      ? state.x 
+      : originalConfigX;
+    const animatedY = (state.y !== undefined && typeof state.y === 'number')
+      ? state.y
+      : originalConfigY;
+    
+    const animOffsetX = animatedX - originalConfigX;
+    const animOffsetY = animatedY - originalConfigY;
+    
+    // 最终位置 = 基准位置 + 片段偏移 + 动画偏移
+    const x = baseX + segmentOffsetX + animOffsetX;
+    const y = baseY + segmentOffsetY + animOffsetY;
+    
+    return {
+      x,
+      y,
+      baseline: 'top', // 分割片段使用 top baseline
+    };
   }
 
   /**

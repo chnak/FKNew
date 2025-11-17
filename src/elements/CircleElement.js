@@ -57,22 +57,19 @@ export class CircleElement extends BaseElement {
     const context = { width: viewSize.width, height: viewSize.height };
     const state = this.getStateAtTime(time, context);
 
-    // 转换位置单位
-    let x = state.x;
-    let y = state.y;
-    if (typeof x === 'string') {
-      x = toPixels(x, context.width, 'x');
-    }
-    if (typeof y === 'string') {
-      y = toPixels(y, context.height, 'y');
-    }
+    // 使用 BaseElement 的通用方法转换位置
+    // state.x 和 state.y 已经在 getStateAtTime 中转换了单位
+    const { x, y } = this.convertPosition(state.x, state.y, context);
 
     // 计算半径
     let radius = state.radius;
     if (typeof radius === 'string') {
-      radius = toPixels(radius, context);
+      // 半径可以基于宽度或高度，这里使用宽度作为基准
+      radius = toPixels(radius, context, 'x');
     } else if (!radius) {
-      radius = Math.min(state.width, state.height) / 2;
+      // 如果没有指定半径，使用 width 和 height 的最小值的一半
+      const { width = 0, height = 0 } = this.convertSize(state.width, state.height, context);
+      radius = Math.min(width, height) / 2;
     }
 
     // 创建圆形

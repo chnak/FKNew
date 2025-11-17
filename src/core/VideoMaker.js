@@ -247,60 +247,9 @@ export class VideoMaker {
             }
           }
           
-          // 如果元素是 CompositionElement，递归收集其内部的音频元素
-          if (element && element.type === 'composition') {
-            // 方法1：从 CompositionElement 的配置中收集音频元素（如果还未初始化）
-            if (element.elementsConfig) {
-              for (const childConfig of element.elementsConfig) {
-                if (childConfig && childConfig.type === 'audio') {
-                  // 创建音频配置对象
-                  audioConfigs.push({
-                    path: childConfig.audioPath || childConfig.src,
-                    startTime: (element.startTime || 0) + (childConfig.startTime || 0),
-                    duration: childConfig.duration,
-                    audioStartTime: childConfig.cutFrom !== undefined ? childConfig.cutFrom : (childConfig.audioStartTime || 0),
-                    audioEndTime: childConfig.cutTo !== undefined ? childConfig.cutTo : childConfig.audioEndTime,
-                    volume: childConfig.volume !== undefined ? childConfig.volume : 1.0,
-                    fadeIn: childConfig.fadeIn || 0,
-                    fadeOut: childConfig.fadeOut || 0,
-                    loop: childConfig.loop || false,
-                  });
-                }
-              }
-            }
-            
-            // 方法2：从 CompositionElement 的 tempComposition 中收集音频元素（如果已初始化）
-            if (element.tempComposition && typeof element.tempComposition.collectAllAudioElements === 'function') {
-              const nestedAudios = element.tempComposition.collectAllAudioElements();
-              // 调整音频的开始时间（加上 CompositionElement 的开始时间）
-              for (const audio of nestedAudios) {
-                audio.startTime = (element.startTime || 0) + (audio.startTime || 0);
-                audioConfigs.push(audio);
-              }
-            }
-            
-            // 方法3：从 CompositionElement 的 elements 中收集 VideoElement 的音频（如果已初始化）
-            if (element.elements) {
-              for (const childElement of element.elements) {
-                if (childElement && childElement.type === 'video') {
-                  const audioConfig = childElement.getAudioConfig();
-                  if (audioConfig && audioConfig.path) {
-                    // 调整音频的开始时间（加上 CompositionElement 的开始时间）
-                    audioConfig.startTime = (element.startTime || 0) + (audioConfig.startTime || 0);
-                    audioConfigs.push(audioConfig);
-                  }
-                }
-              }
-            }
-          }
         }
       }
       
-      // 如果图层是 CompositionLayer，递归收集嵌套合成中的音频
-      if (layer.composition && typeof layer.composition.collectAllAudioElements === 'function') {
-        const nestedAudios = layer.composition.collectAllAudioElements();
-        audioConfigs.push(...nestedAudios);
-      }
     }
     
     return audioConfigs;

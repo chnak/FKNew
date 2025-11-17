@@ -96,83 +96,10 @@ export class VideoExporter {
         TransitionElement.printTransitionStats();
 
         // 收集所有音频元素（在渲染帧的同时可以提前准备）
-      // 注意：需要在渲染前收集，因为 CompositionElement 可能在渲染时才初始化
       let audioConfigs = [];
       
-      // 递归函数：从 CompositionElement 中收集音频
-      const collectFromComposition = (compElement, parentStartTime = 0) => {
-        if (!compElement) return;
-        
-        const currentStartTime = parentStartTime + (compElement.startTime || 0);
-        
-        // 从 elementsConfig 中收集（配置对象）
-        // 注意：Track.build() 返回的配置中使用的是 'elements' 字段，而不是 'elementsConfig'
-        const configArray = compElement.elementsConfig || compElement.elements;
-        if (configArray && Array.isArray(configArray)) {
-          for (const childConfig of configArray) {
-            if (!childConfig) continue;
-            
-            if (childConfig.type === 'audio') {
-              audioConfigs.push({
-                path: childConfig.audioPath || childConfig.src,
-                startTime: currentStartTime + (childConfig.startTime || 0),
-                duration: childConfig.duration,
-                audioStartTime: childConfig.cutFrom !== undefined ? childConfig.cutFrom : (childConfig.audioStartTime || 0),
-                audioEndTime: childConfig.cutTo !== undefined ? childConfig.cutTo : childConfig.audioEndTime,
-                volume: childConfig.volume !== undefined ? childConfig.volume : 1.0,
-                fadeIn: childConfig.fadeIn || 0,
-                fadeOut: childConfig.fadeOut || 0,
-                loop: childConfig.loop || false,
-              });
-            } else if (childConfig.type === 'composition') {
-              // 递归处理嵌套的 CompositionElement（配置对象）
-              collectFromComposition(childConfig, currentStartTime);
-            }
-          }
-        }
-        
-        // 从 elements 中收集（如果存在，这是已初始化的元素实例）
-        // 注意：只有当 elements 和 elementsConfig 不是同一个数组时才处理，避免重复收集
-        if (compElement.elements && Array.isArray(compElement.elements)) {
-          const isSameAsConfig = compElement.elements === compElement.elementsConfig;
-          if (!isSameAsConfig) {
-            for (const childElement of compElement.elements) {
-              if (!childElement) continue;
-              
-              if (childElement.type === 'audio' && childElement.audioPath) {
-                audioConfigs.push(childElement.getAudioConfig ? childElement.getAudioConfig() : {
-                  path: childElement.audioPath,
-                  startTime: currentStartTime + (childElement.startTime || 0),
-                  duration: childElement.duration,
-                  audioStartTime: childElement.audioStartTime || 0,
-                  audioEndTime: childElement.audioEndTime,
-                  volume: childElement.volume || 1.0,
-                  fadeIn: childElement.fadeIn || 0,
-                  fadeOut: childElement.fadeOut || 0,
-                  loop: childElement.loop || false,
-                });
-              }
-            }
-          }
-        }
-      };
-      
-      // 先尝试使用 collectAllAudioElements 方法
+      // 使用 collectAllAudioElements 方法收集音频
       audioConfigs = composition.collectAllAudioElements();
-      
-      // 如果收集到的音频元素为空，从 CompositionElement 的配置中直接收集
-      if (audioConfigs.length === 0) {
-        // 遍历所有图层，查找 CompositionElement
-        for (const layer of composition.timeline.getLayers()) {
-          if (layer.elements) {
-            for (const element of layer.elements) {
-              if (element && element.type === 'composition') {
-                collectFromComposition(element, 0);
-              }
-            }
-          }
-        }
-      }
       
       // 去重：根据路径和开始时间去重
       const uniqueAudioConfigs = [];

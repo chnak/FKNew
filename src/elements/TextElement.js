@@ -2,7 +2,7 @@ import { BaseElement, normalizeAnimationConfig } from './BaseElement.js';
 import { DEFAULT_TEXT_CONFIG } from '../types/constants.js';
 import { deepMerge } from '../utils/helpers.js';
 import { ElementType } from '../types/enums.js';
-import { toFontSizePixels, toPixels } from '../utils/unit-converter.js';
+import { toPixels } from '../utils/unit-converter.js';
 import { getDefaultFontFamily, isFontRegistered } from '../utils/font-manager.js';
 import { TextSplitter } from '../utils/text-splitter.js';
 import { TransformAnimation } from '../animations/TransformAnimation.js';
@@ -51,12 +51,9 @@ export class TextElement extends BaseElement {
     }
     
     // 获取字体大小（可能需要单位转换）
-    let fontSize = this.config.fontSize || 24;
-    if (typeof fontSize === 'string') {
-      // 暂时使用默认上下文，实际渲染时会重新计算
-      const context = { width: 1920, height: 1080, baseFontSize: 16 };
-      fontSize = toFontSizePixels(fontSize, context);
-    }
+    // 暂时使用默认上下文，实际渲染时会重新计算
+    const context = { width: 1920, height: 1080, baseFontSize: 16 };
+    const fontSize = this.convertFontSize(this.config.fontSize, context, 24);
     
     const fontFamily = this.config.fontFamily || getDefaultFontFamily();
     
@@ -254,109 +251,31 @@ export class TextElement extends BaseElement {
     // 进入动画的错开效果通过每个片段的 startTime 不同自然实现
     const state = this.getStateAtTime(time, context);
 
-    // 转换字体大小单位
-    let fontSize = state.fontSize;
-    if (typeof fontSize === 'string') {
-      fontSize = toFontSizePixels(fontSize, context);
-    }
+    // 转换字体大小单位（使用 BaseElement 的通用方法）
+    const fontSize = this.convertFontSize(state.fontSize, context, 24);
 
-    // 确保字体大小有效
-    if (!fontSize || fontSize <= 0) {
-      fontSize = 24; // 默认字体大小
-    }
-
-    // 处理分割后的片段位置计算（需要在转换单位之前处理）
+    // 处理分割后的片段位置计算
     let x, y;
     let segmentBaseline = null; // 用于标记分割片段应该使用的 baseline
     if (this.isSegment && this.config.segmentOffsetX !== undefined) {
-      // 这是分割后的片段，需要计算最终位置
-      const parentX = this.config.parentX || 0;
-      const parentY = this.config.parentY || 0;
-      const anchor = this.config.parentAnchor || [0.5, 0.5];
-      const textAlign = this.config.parentTextAlign || 'center';
-      const totalWidth = this.config.totalTextWidth || 0;
-      const totalHeight = this.config.totalTextHeight || 0;
-      
-      // 转换父元素位置单位
-      const parentXPixels = typeof parentX === 'string' ? toPixels(parentX, context, 'x') : parentX;
-      const parentYPixels = typeof parentY === 'string' ? toPixels(parentY, context, 'y') : parentY;
-      
-      // 计算文本基准位置（考虑 anchor 和 textAlign）
-      // 注意：segmentOffsetY 是相对于文本顶部的（segment.y = 0），所以需要根据 anchor 调整
-      let baseX = parentXPixels;
-      let baseY = parentYPixels;
-      
-      // 根据 anchor 调整位置
-      if (anchor[0] === 0.5) {
-        // 水平居中
-        if (textAlign === 'center') {
-          baseX = baseX - totalWidth / 2;
-        } else if (textAlign === 'right') {
-          baseX = baseX - totalWidth;
-        }
-      } else if (anchor[0] === 1) {
-        // 右对齐
-        if (textAlign === 'center') {
-          baseX = baseX - totalWidth / 2;
-        } else if (textAlign === 'right') {
-          baseX = baseX - totalWidth;
-        }
-      }
-      
-      // 对于垂直方向，segmentOffsetY 是相对于文本顶部的
-      // 所以需要根据 anchor 调整 baseY，使其指向文本顶部
-      if (anchor[1] === 0.5) {
-        // 垂直居中：baseY 应该指向文本顶部，所以减去 totalHeight / 2
-        baseY = baseY - totalHeight / 2;
-        segmentBaseline = 'top'; // 使用 top baseline，因为位置已经计算好了
-      } else if (anchor[1] === 1) {
-        // 底部对齐：baseY 应该指向文本顶部，所以减去 totalHeight
-        baseY = baseY - totalHeight;
-        segmentBaseline = 'top'; // 使用 top baseline
-      } else {
-        // 顶部对齐：baseY 就是文本顶部
-        segmentBaseline = 'top'; // 使用 top baseline
-      }
-      
-      // 最终位置 = 基准位置 + 片段偏移 + 动画偏移（如果有）
-      const offsetX = this.config.segmentOffsetX !== undefined ? this.config.segmentOffsetX : 0;
-      const offsetY = this.config.segmentOffsetY !== undefined ? this.config.segmentOffsetY : 0;
-      
-      // 应用动画的位置偏移
-      // 对于分割文本，this.config.x 和 this.config.y 应该和 parentX/parentY 一样
-      // state.x 和 state.y 已经包含了动画的偏移（translateX/translateY 已转换为绝对位置）
-      // 需要计算相对于父元素原始位置的偏移量
-      const originalConfigX = typeof this.config.x === 'string' 
-        ? toPixels(this.config.x, context, 'x')
-        : (this.config.x || 0);
-      const originalConfigY = typeof this.config.y === 'string'
-        ? toPixels(this.config.y, context, 'y')
-        : (this.config.y || 0);
-      
-      // 获取动画后的位置（state.x 和 state.y 已经包含了动画偏移）
-      const animatedX = (state.x !== undefined && typeof state.x === 'number') 
-        ? state.x 
-        : originalConfigX;
-      const animatedY = (state.y !== undefined && typeof state.y === 'number')
-        ? state.y
-        : originalConfigY;
-      
-      // 计算动画偏移量（相对于元素原始位置）
-      const animOffsetX = animatedX - originalConfigX;
-      const animOffsetY = animatedY - originalConfigY;
-      
-      x = baseX + offsetX + animOffsetX;
-      y = baseY + offsetY + animOffsetY;
+      // 这是分割后的片段，使用 BaseElement 的通用方法计算位置
+      const segmentPos = this.calculateSegmentPosition(state, context, {
+        parentX: this.config.parentX || 0,
+        parentY: this.config.parentY || 0,
+        parentAnchor: this.config.parentAnchor || [0.5, 0.5],
+        parentTextAlign: this.config.parentTextAlign || 'center',
+        totalTextWidth: this.config.totalTextWidth || 0,
+        totalTextHeight: this.config.totalTextHeight || 0,
+        segmentOffsetX: this.config.segmentOffsetX || 0,
+        segmentOffsetY: this.config.segmentOffsetY || 0,
+      });
+      x = segmentPos.x;
+      y = segmentPos.y;
+      segmentBaseline = segmentPos.baseline;
     } else {
-      // 普通元素，转换位置单位
-      x = state.x;
-      y = state.y;
-      if (typeof x === 'string') {
-        x = toPixels(x, context, 'x');
-      }
-      if (typeof y === 'string') {
-        y = toPixels(y, context, 'y');
-      }
+      // 普通元素，state.x 和 state.y 已经在 getStateAtTime 中转换了单位
+      x = state.x || 0;
+      y = state.y || 0;
     }
 
     // 构建字体字符串

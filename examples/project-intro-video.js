@@ -1,9 +1,8 @@
 /**
- * FKNew 项目简介视频
+ * FKbuilder 项目简介视频
  * 使用指定的配色方案制作
  */
-import { VideoBuilder } from '../src/index.js';
-import { registerFontFile } from '../src/utils/font-manager.js';
+import { VideoBuilder, getAudioDuration } from '../src/index.js';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,24 +10,20 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 配色方案
+// ========== 配色方案 ==========
 const colors = {
-  aquamarine: '#75b7d0',
-  navyBlue: '#263f60',
-  lint: '#e4ebe0',
-  blue: '#3982b0',
+  peach: '#fcdec3',           // Peach - 温暖、柔和
+  pewter: '#e6e9e6',          // Pewter - 中性、优雅
+  blueGrotto: '#208ab7',      // Blue Grotto - 主色、专业
+  babyBlue: '#5acbed',        // Baby Blue - 明亮、清新
+  babyBlueLight: '#cbe7e8',   // Baby Blue Light - 浅色、柔和
+  babyBlueLighter: '#dbf3f4', // Baby Blue Lighter - 极浅、背景
+  blueGrottoDark: '#0d659d',  // Blue Grotto Dark - 深色、强调
+  ebony: '#2e3b3c',           // Ebony - 深色、对比
 };
 
-// 注册字体
-const fontPath = 'D:/code/foliko-trade/public/fonts/MicrosoftYaHei-Bold-01.ttf';
-try {
-  registerFontFile(fontPath, 'MicrosoftYaHei');
-} catch (error) {
-  console.warn('字体注册失败，将使用默认字体:', error.message);
-}
-
 async function createProjectIntroVideo() {
-  console.log('🎬 创建 FKNew 项目简介视频...\n');
+  console.log('🎬 创建 FKbuilder 项目简介视频...\n');
 
   const assetsDir = path.join(__dirname, '../assets');
   const outputDir = path.join(__dirname, '../output');
@@ -63,10 +58,10 @@ async function createProjectIntroVideo() {
     duration: sceneDuration,
     startTime: currentTime,
   })
-    .addBackground({ color: colors.navyBlue })
+    .addBackground({ color: colors.ebony })
     .addText({
-      text: 'FKNew',
-      color: colors.aquamarine,
+      text: 'FKbuilder',
+      color: colors.babyBlue,
       fontSize: 180,
       x: '50%',
       y: '40%',
@@ -74,16 +69,29 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['bigIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.ebony,
       textShadowBlur: 30,
+      gradient: true,
+      gradientColors: [colors.babyBlue, colors.blueGrotto],
+      gradientDirection: 'horizontal',
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 1) {
+          // 呼吸效果：轻微缩放
+          const breath = 1 + Math.sin((event.time - 1) * 2) * 0.03;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(breath / currentScale, pivot);
+        }
+      },
     })
     .addText({
       text: '程序化视频生成库',
-      color: colors.lint,
+      color: colors.pewter,
       fontSize: 60,
       x: '50%',
       y: '60%',
@@ -91,9 +99,30 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.5,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       animations: ['fadeIn'],
       delay: 0.3,
+      textShadow: true,
+      textShadowColor: colors.ebony,
+      textShadowBlur: 20,
+    })
+    .addText({
+      text: 'GitHub: github.com/chnak/FKbuilder',
+      color: colors.babyBlueLight,
+      fontSize: 36,
+      x: '50%',
+      y: '85%',
+      textAlign: 'center',
+      anchor: [0.5, 0.5],
+      duration: sceneDuration,
+      startTime: 1.5,
+      fontFamily: '微软雅黑',
+      animations: ['fadeIn'],
+      delay: 0.5,
+      textShadow: true,
+      textShadowColor: colors.ebony,
+      textShadowBlur: 15,
+      opacity: 0.9,
     });
 
   currentTime += sceneDuration;
@@ -105,10 +134,10 @@ async function createProjectIntroVideo() {
     duration: sceneDuration,
     startTime: scene2StartTime,
   })
-    .addBackground({ color: colors.lint })
+    .addBackground({ color: colors.pewter })
     .addText({
       text: '丰富的文本效果',
-      color: colors.navyBlue,
+      color: colors.ebony,
       fontSize: 100,
       x: '50%',
       y: '30%',
@@ -116,16 +145,16 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.blueGrotto,
       textShadowBlur: 20,
     })
     .addText({
       text: '渐变 · 阴影 · 发光 · 描边',
-      color: colors.blue,
+      color: colors.blueGrotto,
       fontSize: 50,
       x: '50%',
       y: '55%',
@@ -133,16 +162,26 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.5,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       animations: ['fadeIn'],
       delay: 0.3,
       gradient: true,
-      gradientColors: [colors.aquamarine, colors.blue],
+      gradientColors: [colors.babyBlue, colors.blueGrotto],
       gradientDirection: 'horizontal',
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 1.2) {
+          // 脉冲效果
+          const pulse = 1 + Math.sin((event.time - 1.2) * 3) * 0.05;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(pulse / currentScale, pivot);
+        }
+      },
     })
     .addText({
       text: 'Split Animation',
-      color: colors.navyBlue,
+      color: colors.ebony,
       fontSize: 70,
       x: '50%',
       y: '75%',
@@ -150,10 +189,20 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       split: 'letter',
       splitDelay: 0.1,
       animations: ['fadeIn'],
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 2) {
+          // 在所有字母出现后添加轻微脉冲
+          const pulse = 1 + Math.sin((event.time - 2) * 2.5) * 0.03;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(pulse / currentScale, pivot);
+        }
+      },
     });
 
   mainTrack.addTransition({
@@ -171,10 +220,10 @@ async function createProjectIntroVideo() {
     duration: sceneDuration,
     startTime: scene3StartTime,
   })
-    .addBackground({ color: colors.navyBlue })
+    .addBackground({ color: colors.ebony })
     .addText({
       text: '强大的动画系统',
-      color: colors.aquamarine,
+      color: colors.babyBlue,
       fontSize: 100,
       x: '50%',
       y: '25%',
@@ -182,48 +231,81 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.blueGrotto,
       textShadowBlur: 20,
     })
     .addCircle({
       x: '30%',
       y: '60%',
       radius: 80,
-      bgcolor: colors.aquamarine,
+      bgcolor: colors.babyBlue,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.5,
       animations: ['bounce'],
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 1) {
+          // 旋转 + 脉冲
+          const rotation = (event.time - 1) * 30;
+          const currentRotation = paperItem.rotation || 0;
+          paperItem.rotate(rotation - currentRotation, pivot);
+          const pulse = 1 + Math.sin((event.time - 1) * 2) * 0.15;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(pulse / currentScale, pivot);
+        }
+      },
     })
     .addRect({
       x: '50%',
       y: '60%',
       width: 160,
       height: 160,
-      bgcolor: colors.blue,
+      bgcolor: colors.blueGrotto,
       borderRadius: 20,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.7,
       animations: ['rotate'],
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 1.2) {
+          // 持续旋转
+          const rotation = (event.time - 1.2) * 45;
+          const currentRotation = paperItem.rotation || 0;
+          paperItem.rotate(rotation - currentRotation, pivot);
+        }
+      },
     })
     .addCircle({
       x: '70%',
       y: '60%',
       radius: 80,
-      bgcolor: colors.lint,
+      bgcolor: colors.pewter,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.9,
       animations: ['scale'],
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 1.4) {
+          // 缩放脉冲
+          const scale = 1 + Math.sin((event.time - 1.4) * 2.5) * 0.2;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(scale / currentScale, pivot);
+        }
+      },
     })
     .addText({
       text: '预设动画 · 关键帧 · 缓动函数',
-      color: colors.lint,
+      color: colors.pewter,
       fontSize: 45,
       x: '50%',
       y: '85%',
@@ -231,7 +313,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1.5,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       animations: ['fadeIn'],
     });
 
@@ -250,10 +332,10 @@ async function createProjectIntroVideo() {
     duration: sceneDuration,
     startTime: scene4StartTime,
   })
-    .addBackground({ color: colors.lint })
+    .addBackground({ color: colors.pewter })
     .addText({
       text: '多轨道多场景',
-      color: colors.navyBlue,
+      color: colors.ebony,
       fontSize: 100,
       x: '50%',
       y: '25%',
@@ -261,11 +343,11 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.blueGrotto,
       textShadowBlur: 20,
     })
     .addRect({
@@ -273,17 +355,28 @@ async function createProjectIntroVideo() {
       y: '55%',
       width: 300,
       height: 200,
-      bgcolor: colors.aquamarine,
+      bgcolor: colors.babyBlue,
       borderRadius: 15,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.5,
       animations: ['fadeIn'],
       opacity: 0.8,
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        if (event.time > 1) {
+          // 轻微上下浮动
+          const float = Math.sin((event.time - 1) * 1.5) * 10;
+          const baseY = 1080 * 0.55; // 原始Y位置
+          if (paperItem.position) {
+            paperItem.position.y = baseY + float;
+          }
+        }
+      },
     })
     .addText({
       text: '轨道1',
-      color: colors.navyBlue,
+      color: colors.ebony,
       fontSize: 50,
       x: '25%',
       y: '55%',
@@ -291,7 +384,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.7,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
     })
@@ -300,17 +393,28 @@ async function createProjectIntroVideo() {
       y: '55%',
       width: 300,
       height: 200,
-      bgcolor: colors.blue,
+      bgcolor: colors.blueGrotto,
       borderRadius: 15,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.6,
       animations: ['fadeIn'],
       opacity: 0.8,
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        if (event.time > 1.1) {
+          // 轻微上下浮动（相位偏移）
+          const float = Math.sin((event.time - 1.1) * 1.5 + Math.PI / 3) * 10;
+          const baseY = 1080 * 0.55; // 原始Y位置
+          if (paperItem.position) {
+            paperItem.position.y = baseY + float;
+          }
+        }
+      },
     })
     .addText({
       text: '轨道2',
-      color: colors.lint,
+      color: colors.pewter,
       fontSize: 50,
       x: '50%',
       y: '55%',
@@ -318,7 +422,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.8,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
     })
@@ -327,17 +431,28 @@ async function createProjectIntroVideo() {
       y: '55%',
       width: 300,
       height: 200,
-      bgcolor: colors.navyBlue,
+      bgcolor: colors.ebony,
       borderRadius: 15,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.7,
       animations: ['fadeIn'],
       opacity: 0.8,
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        if (event.time > 1.2) {
+          // 轻微上下浮动（相位偏移）
+          const float = Math.sin((event.time - 1.2) * 1.5 + Math.PI * 2 / 3) * 10;
+          const baseY = 1080 * 0.55; // 原始Y位置
+          if (paperItem.position) {
+            paperItem.position.y = baseY + float;
+          }
+        }
+      },
     })
     .addText({
       text: '轨道3',
-      color: colors.aquamarine,
+      color: colors.babyBlue,
       fontSize: 50,
       x: '75%',
       y: '55%',
@@ -345,13 +460,13 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.9,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
     })
     .addText({
       text: '灵活的场景组合 · 丰富的转场效果',
-      color: colors.blue,
+      color: colors.blueGrotto,
       fontSize: 45,
       x: '50%',
       y: '85%',
@@ -359,7 +474,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1.5,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       animations: ['fadeIn'],
     });
 
@@ -378,10 +493,10 @@ async function createProjectIntroVideo() {
     duration: sceneDuration,
     startTime: scene5StartTime,
   })
-    .addBackground({ color: colors.navyBlue })
+    .addBackground({ color: colors.ebony })
     .addText({
       text: '完整的媒体支持',
-      color: colors.aquamarine,
+      color: colors.babyBlue,
       fontSize: 100,
       x: '50%',
       y: '25%',
@@ -389,11 +504,11 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.blueGrotto,
       textShadowBlur: 20,
     })
     .addRect({
@@ -401,7 +516,7 @@ async function createProjectIntroVideo() {
       y: '60%',
       width: 200,
       height: 200,
-      bgcolor: colors.aquamarine,
+      bgcolor: colors.babyBlue,
       borderRadius: 10,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
@@ -410,7 +525,7 @@ async function createProjectIntroVideo() {
     })
     .addText({
       text: '图片',
-      color: colors.navyBlue,
+      color: colors.ebony,
       fontSize: 40,
       x: '20%',
       y: '60%',
@@ -418,7 +533,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.7,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
     })
@@ -427,7 +542,7 @@ async function createProjectIntroVideo() {
       y: '60%',
       width: 200,
       height: 200,
-      bgcolor: colors.blue,
+      bgcolor: colors.blueGrotto,
       borderRadius: 10,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
@@ -436,7 +551,7 @@ async function createProjectIntroVideo() {
     })
     .addText({
       text: '视频',
-      color: colors.lint,
+      color: colors.pewter,
       fontSize: 40,
       x: '40%',
       y: '60%',
@@ -444,7 +559,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.8,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
     })
@@ -453,7 +568,7 @@ async function createProjectIntroVideo() {
       y: '60%',
       width: 200,
       height: 200,
-      bgcolor: colors.lint,
+      bgcolor: colors.pewter,
       borderRadius: 10,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
@@ -462,7 +577,7 @@ async function createProjectIntroVideo() {
     })
     .addText({
       text: '音频',
-      color: colors.navyBlue,
+      color: colors.ebony,
       fontSize: 40,
       x: '60%',
       y: '60%',
@@ -470,7 +585,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.9,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
     })
@@ -479,7 +594,7 @@ async function createProjectIntroVideo() {
       y: '60%',
       width: 200,
       height: 200,
-      bgcolor: colors.navyBlue,
+      bgcolor: colors.ebony,
       borderRadius: 10,
       anchor: [0.5, 0.5],
       duration: sceneDuration,
@@ -488,7 +603,7 @@ async function createProjectIntroVideo() {
     })
     .addText({
       text: '字幕',
-      color: colors.aquamarine,
+      color: colors.babyBlue,
       fontSize: 40,
       x: '80%',
       y: '60%',
@@ -496,13 +611,13 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
     })
     .addText({
       text: '图片 · 视频 · 音频 · 字幕 · 波形',
-      color: colors.lint,
+      color: colors.pewter,
       fontSize: 45,
       x: '50%',
       y: '85%',
@@ -510,7 +625,7 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1.5,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       animations: ['fadeIn'],
     });
 
@@ -529,10 +644,10 @@ async function createProjectIntroVideo() {
     duration: sceneDuration,
     startTime: scene6StartTime,
   })
-    .addBackground({ color: colors.navyBlue })
+    .addBackground({ color: colors.ebony })
     .addText({
       text: '文字拆分动画',
-      color: colors.aquamarine,
+      color: colors.babyBlue,
       fontSize: 100,
       x: '50%',
       y: '30%',
@@ -540,16 +655,16 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['fadeIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.blueGrotto,
       textShadowBlur: 20,
     })
     .addText({
-      text: 'FKNew',
-      color: colors.lint,
+      text: 'FKbuilder',
+      color: colors.pewter,
       fontSize: 120,
       x: '50%',
       y: '55%',
@@ -557,21 +672,31 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.5,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       split: 'letter',
       splitDelay: 0.1,
       animations: ['fadeIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.blueGrotto,
       textShadowBlur: 15,
       stroke: true,
-      strokeColor: colors.aquamarine,
+      strokeColor: colors.babyBlue,
       strokeWidth: 2,
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 2) {
+          // 在所有字母出现后添加呼吸效果
+          const breath = 1 + Math.sin((event.time - 2) * 1.5) * 0.04;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(breath / currentScale, pivot);
+        }
+      },
     })
     .addText({
       text: '逐字显示',
-      color: colors.blue,
+      color: colors.blueGrotto,
       fontSize: 80,
       x: '50%',
       y: '75%',
@@ -579,12 +704,12 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 1.5,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       split: 'word',
       splitDelay: 0.15,
       animations: ['bounceIn'],
       gradient: true,
-      gradientColors: [colors.aquamarine, colors.blue],
+      gradientColors: [colors.babyBlue, colors.blueGrotto],
       gradientDirection: 'horizontal',
     });
 
@@ -605,10 +730,10 @@ async function createProjectIntroVideo() {
       duration: sceneDuration,
       startTime: scene7StartTime,
     })
-      .addBackground({ color: colors.lint })
+      .addBackground({ color: colors.pewter })
       .addText({
         text: '图片元素',
-        color: colors.navyBlue,
+        color: colors.ebony,
         fontSize: 100,
         x: '50%',
         y: '15%',
@@ -616,11 +741,11 @@ async function createProjectIntroVideo() {
         anchor: [0.5, 0.5],
         duration: sceneDuration,
         startTime: 0,
-        fontFamily: 'MicrosoftYaHei',
+        fontFamily: '微软雅黑',
         fontWeight: 'bold',
         animations: ['fadeIn'],
         textShadow: true,
-        textShadowColor: colors.blue,
+        textShadowColor: colors.blueGrotto,
         textShadowBlur: 20,
       })
       .addImage({
@@ -636,13 +761,13 @@ async function createProjectIntroVideo() {
         animations: ['zoomIn'],
         borderRadius: 20,
         shadowBlur: 30,
-        shadowColor: colors.navyBlue,
+        shadowColor: colors.ebony,
         shadowOffsetX: 0,
         shadowOffsetY: 10,
       })
       .addText({
         text: '支持多种图片格式 · 丰富的视觉效果',
-        color: colors.blue,
+        color: colors.blueGrotto,
         fontSize: 45,
         x: '50%',
         y: '90%',
@@ -650,7 +775,7 @@ async function createProjectIntroVideo() {
         anchor: [0.5, 0.5],
         duration: sceneDuration,
         startTime: 1.5,
-        fontFamily: 'MicrosoftYaHei',
+        fontFamily: '微软雅黑',
         animations: ['fadeIn'],
       });
 
@@ -672,10 +797,10 @@ async function createProjectIntroVideo() {
       duration: sceneDuration,
       startTime: scene8StartTime,
     })
-      .addBackground({ color: colors.navyBlue })
+      .addBackground({ color: colors.ebony })
       .addText({
         text: '视频元素',
-        color: colors.aquamarine,
+        color: colors.babyBlue,
         fontSize: 100,
         x: '50%',
         y: '15%',
@@ -683,11 +808,11 @@ async function createProjectIntroVideo() {
         anchor: [0.5, 0.5],
         duration: sceneDuration,
         startTime: 0,
-        fontFamily: 'MicrosoftYaHei',
+        fontFamily: '微软雅黑',
         fontWeight: 'bold',
         animations: ['fadeIn'],
         textShadow: true,
-        textShadowColor: colors.blue,
+        textShadowColor: colors.blueGrotto,
         textShadowBlur: 20,
       })
       .addVideo({
@@ -703,13 +828,13 @@ async function createProjectIntroVideo() {
         animations: ['fadeIn'],
         borderRadius: 20,
         shadowBlur: 30,
-        shadowColor: colors.navyBlue,
+        shadowColor: colors.ebony,
         shadowOffsetX: 0,
         shadowOffsetY: 10,
       })
       .addText({
         text: '视频嵌入 · 音频提取 · 帧缓冲',
-        color: colors.lint,
+        color: colors.pewter,
         fontSize: 45,
         x: '50%',
         y: '90%',
@@ -717,7 +842,7 @@ async function createProjectIntroVideo() {
         anchor: [0.5, 0.5],
         duration: sceneDuration,
         startTime: 1.5,
-        fontFamily: 'MicrosoftYaHei',
+        fontFamily: '微软雅黑',
         animations: ['fadeIn'],
       });
 
@@ -739,10 +864,10 @@ async function createProjectIntroVideo() {
       duration: sceneDuration,
       startTime: scene9StartTime,
     })
-      .addBackground({ color: colors.navyBlue })
+      .addBackground({ color: colors.ebony })
       .addText({
         text: '音频示波器',
-        color: colors.aquamarine,
+        color: colors.babyBlue,
         fontSize: 100,
         x: '50%',
         y: '15%',
@@ -750,11 +875,11 @@ async function createProjectIntroVideo() {
         anchor: [0.5, 0.5],
         duration: sceneDuration,
         startTime: 0,
-        fontFamily: 'MicrosoftYaHei',
+        fontFamily: '微软雅黑',
         fontWeight: 'bold',
         animations: ['fadeIn'],
         textShadow: true,
-        textShadowColor: colors.blue,
+        textShadowColor: colors.blueGrotto,
         textShadowBlur: 20,
       })
       .addOscilloscope({
@@ -763,8 +888,8 @@ async function createProjectIntroVideo() {
         y: '40%',
         width: 1600,
         height: 200,
-        waveColor: colors.aquamarine,
-        backgroundColor: 'rgba(38, 63, 96, 0.5)',
+        waveColor: colors.babyBlue,
+        backgroundColor: `${colors.blueGrottoDark}80`,
         style: 'line',
         lineWidth: 3,
         mirror: true,
@@ -778,8 +903,8 @@ async function createProjectIntroVideo() {
         y: '70%',
         width: 1600,
         height: 300,
-        waveColor: colors.blue,
-        backgroundColor: 'rgba(38, 63, 96, 0.3)',
+        waveColor: colors.blueGrotto,
+        backgroundColor: `${colors.blueGrottoDark}50`,
         style: 'bars',
         barWidth: 4,
         barGap: 2,
@@ -790,7 +915,7 @@ async function createProjectIntroVideo() {
       })
       .addText({
         text: '线条样式 · 柱状样式 · 实时波形',
-        color: colors.lint,
+        color: colors.pewter,
         fontSize: 45,
         x: '50%',
         y: '90%',
@@ -798,7 +923,7 @@ async function createProjectIntroVideo() {
         anchor: [0.5, 0.5],
         duration: sceneDuration,
         startTime: 1.5,
-        fontFamily: 'MicrosoftYaHei',
+        fontFamily: '微软雅黑',
         animations: ['fadeIn'],
       });
 
@@ -818,10 +943,10 @@ async function createProjectIntroVideo() {
     duration: sceneDuration,
     startTime: scene10StartTime,
   })
-    .addBackground({ color: colors.navyBlue })
+    .addBackground({ color: colors.ebony })
     .addText({
-      text: 'FKNew',
-      color: colors.aquamarine,
+      text: 'FKbuilder',
+      color: colors.babyBlue,
       fontSize: 150,
       x: '50%',
       y: '40%',
@@ -829,19 +954,32 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       fontWeight: 'bold',
       animations: ['bigIn'],
       textShadow: true,
-      textShadowColor: colors.blue,
+      textShadowColor: colors.blueGrotto,
       textShadowBlur: 40,
       textGlow: true,
-      textGlowColor: colors.aquamarine,
+      textGlowColor: colors.babyBlue,
       textGlowBlur: 30,
+      gradient: true,
+      gradientColors: [colors.babyBlue, colors.blueGrotto],
+      gradientDirection: 'horizontal',
+      onFrame: (element, event, paperItem) => {
+        if (!paperItem) return;
+        const pivot = paperItem.position || paperItem.center;
+        if (pivot && event.time > 1.5) {
+          // 呼吸效果：轻微缩放
+          const breath = 1 + Math.sin((event.time - 1.5) * 2) * 0.04;
+          const currentScale = paperItem.scaling ? paperItem.scaling.x : 1;
+          paperItem.scale(breath / currentScale, pivot);
+        }
+      },
     })
     .addText({
       text: '让视频创作更简单',
-      color: colors.lint,
+      color: colors.pewter,
       fontSize: 60,
       x: '50%',
       y: '60%',
@@ -849,13 +987,13 @@ async function createProjectIntroVideo() {
       anchor: [0.5, 0.5],
       duration: sceneDuration,
       startTime: 0.8,
-      fontFamily: 'MicrosoftYaHei',
+      fontFamily: '微软雅黑',
       animations: ['fadeIn'],
       delay: 0.3,
     })
     .addText({
       text: 'Programmatic Video Generation',
-      color: colors.blue,
+      color: colors.blueGrotto,
       fontSize: 40,
       x: '50%',
       y: '75%',
@@ -867,6 +1005,24 @@ async function createProjectIntroVideo() {
       fontStyle: 'italic',
       animations: ['fadeIn'],
       delay: 0.5,
+    })
+    .addText({
+      text: 'GitHub: github.com/chnak/FKbuilder',
+      color: colors.babyBlueLight,
+      fontSize: 38,
+      x: '50%',
+      y: '88%',
+      textAlign: 'center',
+      anchor: [0.5, 0.5],
+      duration: sceneDuration,
+      startTime: 1.8,
+      fontFamily: '微软雅黑',
+      animations: ['fadeIn'],
+      delay: 0.5,
+      textShadow: true,
+      textShadowColor: colors.ebony,
+      textShadowBlur: 18,
+      opacity: 0.9,
     });
 
   mainTrack.addTransition({
@@ -877,26 +1033,25 @@ async function createProjectIntroVideo() {
 
   // 导出视频
   const outputPath = path.join(outputDir, 'project-intro-video.mp4');
-  console.log(`\n🚀 开始导出视频...`);
+  console.log(`\n🚀 开始渲染视频...`);
   console.log(`输出路径: ${outputPath}\n`);
   console.log(`总时长: ${builder.getTotalDuration().toFixed(2)} 秒`);
   console.log(`场景数: ${mainTrack.scenes.length}`);
   console.log(`转场数: ${mainTrack.transitions.length}\n`);
 
   try {
-    await builder.export(outputPath, {
+    // 使用 render() 方法自动 build 和 export
+    const resultPath = await builder.render(outputPath, {
       quality: 'high',
       bitrate: '10M',
     });
 
-    console.log('✅ 视频导出成功！');
-    console.log(`📁 文件位置: ${outputPath}`);
+    console.log('✅ 视频渲染成功！');
+    console.log(`📁 文件位置: ${resultPath}`);
     console.log(`⏱️  总时长: ${builder.getTotalDuration().toFixed(2)} 秒`);
   } catch (error) {
-    console.error('❌ 导出失败:', error);
+    console.error('❌ 渲染失败:', error);
     throw error;
-  } finally {
-    builder.destroy();
   }
 }
 

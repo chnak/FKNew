@@ -133,16 +133,9 @@ export class PathElement extends BaseElement {
       return null;
     }
 
-    // 转换位置单位
-    let x = state.x;
-    let y = state.y;
-
-    if (typeof x === 'string') {
-      x = toPixels(x, context.width, 'x');
-    }
-    if (typeof y === 'string') {
-      y = toPixels(y, context.height, 'y');
-    }
+    // 使用 BaseElement 的通用方法转换位置
+    // state.x 和 state.y 已经在 getStateAtTime 中转换了单位
+    const { x, y } = this.convertPosition(state.x, state.y, context);
 
     // 处理 anchor
     const anchor = state.anchor || [0, 0];

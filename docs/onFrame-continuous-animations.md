@@ -282,3 +282,4 @@ starPositions.forEach((star, index) => {
 - [onFrame 参数说明](./onFrame-params.md) - 详细的参数说明
 - [onFrame vs onRender](./onFrame-vs-onRender.md) - 两种回调的区别和使用场景
 
+

@@ -123,29 +123,22 @@ export class JSONElement extends BaseElement {
     };
     const state = this.getStateAtTime(time, context);
 
-    // 转换位置和尺寸单位
-    let x = state.x;
-    let y = state.y;
+    // 使用 BaseElement 的通用方法转换尺寸
     let width = state.width || this.width;
     let height = state.height || this.height;
+    const size = this.convertSize(width, height, context);
+    width = size.width;
+    height = size.height;
+    
+    // state.x 和 state.y 已经在 getStateAtTime 中转换了单位
+    const x = state.x || 0;
+    const y = state.y || 0;
 
-    if (typeof x === 'string') {
-      x = toPixels(x, context.width, 'x');
-    }
-    if (typeof y === 'string') {
-      y = toPixels(y, context.height, 'y');
-    }
-    if (typeof width === 'string') {
-      width = toPixels(width, context.width, 'x');
-    }
-    if (typeof height === 'string') {
-      height = toPixels(height, context.height, 'y');
-    }
-
-    // 处理 anchor
-    const anchor = state.anchor || [0.5, 0.5];
-    const rectX = x - width * anchor[0];
-    const rectY = y - height * anchor[1];
+    // 使用 BaseElement 的通用方法计算位置（包括 anchor 对齐）
+    const { x: rectX, y: rectY } = this.calculatePosition(state, context, {
+      elementWidth: width,
+      elementHeight: height,
+    });
 
     try {
       // 使用 Paper.js 导入 JSON

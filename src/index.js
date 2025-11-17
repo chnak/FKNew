@@ -16,7 +16,6 @@ export { BaseLayer } from './layers/BaseLayer.js';
 export { ElementLayer } from './layers/ElementLayer.js';
 export { BackgroundLayer } from './layers/BackgroundLayer.js';
 export { OverlayLayer } from './layers/OverlayLayer.js';
-export { CompositionLayer } from './layers/CompositionLayer.js';
 
 // 元素类
 export { BaseElement } from './elements/BaseElement.js';
@@ -27,7 +26,6 @@ export { VideoElement } from './elements/VideoElement.js';
 export { RectElement } from './elements/RectElement.js';
 export { CircleElement } from './elements/CircleElement.js';
 export { SpriteElement } from './elements/SpriteElement.js';
-export { CompositionElement } from './elements/CompositionElement.js';
 export { OscilloscopeElement } from './elements/OscilloscopeElement.js';
 
 // 动画类

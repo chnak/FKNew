@@ -2,7 +2,6 @@ import { BaseElement, normalizeAnimationConfig } from './BaseElement.js';
 import { TextElement } from './TextElement.js';
 import { ElementType } from '../types/enums.js';
 import { parseSubtitles, calculateMixedTextCapacity } from '../utils/subtitle-utils.js';
-import { toFontSizePixels } from '../utils/unit-converter.js';
 import { getDefaultFontFamily } from '../utils/font-manager.js';
 import paper from 'paper-jsdom-canvas';
 
@@ -98,12 +97,9 @@ export class SubtitleElement extends BaseElement {
     
     const { width = 1920, height = 1080 } = context;
     
-    // 获取字体大小（可能需要单位转换）
-    let fontSize = this.fontSize;
-    if (typeof fontSize === 'string') {
-      const unitContext = { width, height, baseFontSize: 16 };
-      fontSize = toFontSizePixels(fontSize, unitContext);
-    }
+    // 使用 BaseElement 的通用方法转换字体大小
+    const unitContext = { width, height, baseFontSize: 16 };
+    const fontSize = this.convertFontSize(this.fontSize, unitContext, 24);
     
     const fontFamily = this.fontFamily || getDefaultFontFamily();
     

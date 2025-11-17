@@ -43,7 +43,7 @@ export class ElementLayer extends BaseLayer {
           
           // 使用 Paper.js 渲染
           if (typeof element.render === 'function') {
-            // 支持异步渲染（如 CompositionElement）
+            // 支持异步渲染
             const result = element.render(layer, time);
             if (result && typeof result.then === 'function') {
               await result;

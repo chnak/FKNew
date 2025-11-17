@@ -27,7 +27,6 @@ export const ElementType = {
   SVG: 'svg',
   JSON: 'json',
   SPRITE: 'sprite',
-  COMPOSITION: 'composition',
   TRANSITION: 'transition',
   AUDIO: 'audio',
   OSCILLOSCOPE: 'oscilloscope',
@@ -40,7 +39,6 @@ export const LayerType = {
   ELEMENT: 'element',
   BACKGROUND: 'background',
   OVERLAY: 'overlay',
-  COMPOSITION: 'composition',
 };
 
 /**

@@ -61,29 +61,17 @@ export class RectElement extends BaseElement {
     };
     const state = this.getStateAtTime(time, context);
 
-    // 转换位置和尺寸单位
-    let x = state.x;
-    let y = state.y;
-    let width = state.width;
-    let height = state.height;
+    // 使用 BaseElement 的通用方法转换尺寸
+    // state.x 和 state.y 已经在 getStateAtTime 中转换了单位
+    const { width, height } = this.convertSize(state.width, state.height, context);
+    const x = state.x || 0;
+    const y = state.y || 0;
 
-    if (typeof x === 'string') {
-      x = toPixels(x, context.width, 'x');
-    }
-    if (typeof y === 'string') {
-      y = toPixels(y, context.height, 'y');
-    }
-    if (typeof width === 'string') {
-      width = toPixels(width, context.width, 'x');
-    }
-    if (typeof height === 'string') {
-      height = toPixels(height, context.height, 'y');
-    }
-
-    // 处理 anchor
-    const anchor = state.anchor || [0.5, 0.5];
-    const rectX = x - width * anchor[0];
-    const rectY = y - height * anchor[1];
+    // 使用 BaseElement 的通用方法计算位置（包括 anchor 对齐）
+    const { x: rectX, y: rectY } = this.calculatePosition(state, context, {
+      elementWidth: width,
+      elementHeight: height,
+    });
 
     // 创建矩形
     let rect;

@@ -82,15 +82,12 @@ export class VideoElement extends BaseElement {
         height: this.canvasHeight || viewSize.height 
       };
 
-      let targetWidth = this.config.width;
-      let targetHeight = this.config.height;
-
-      if (typeof targetWidth === 'string') {
-        targetWidth = toPixels(targetWidth, context, 'x');
-      }
-      if (typeof targetHeight === 'string') {
-        targetHeight = toPixels(targetHeight, context, 'y');
-      }
+      // 使用 BaseElement 的通用方法转换尺寸
+      let { width: targetWidth, height: targetHeight } = this.convertSize(
+        this.config.width,
+        this.config.height,
+        context
+      );
 
       if (!targetWidth) targetWidth = context.width;
       if (!targetHeight) targetHeight = context.height;
@@ -432,28 +429,22 @@ export class VideoElement extends BaseElement {
     const state = this.getStateAtTime(time, context);
 
     // 转换位置和尺寸单位
-    let x = state.x;
-    let y = state.y;
+    // 使用 BaseElement 的通用方法转换尺寸
     let width = state.width;
     let height = state.height;
+    const size = this.convertSize(width, height, context);
+    width = size.width;
+    height = size.height;
+    
+    // state.x 和 state.y 已经在 getStateAtTime 中转换了单位
+    const x = state.x || 0;
+    const y = state.y || 0;
 
-    if (typeof x === 'string') {
-      x = toPixels(x, context, 'x');
-    }
-    if (typeof y === 'string') {
-      y = toPixels(y, context, 'y');
-    }
-    if (typeof width === 'string') {
-      width = toPixels(width, context, 'x');
-    }
-    if (typeof height === 'string') {
-      height = toPixels(height, context, 'y');
-    }
-
-    // 处理 anchor
-    const anchor = state.anchor || [0.5, 0.5];
-    const rectX = x - width * anchor[0];
-    const rectY = y - height * anchor[1];
+    // 使用 BaseElement 的通用方法计算位置（包括 anchor 对齐）
+    const { x: rectX, y: rectY } = this.calculatePosition(state, context, {
+      elementWidth: width,
+      elementHeight: height,
+    });
 
     // 应用滤镜效果（在创建 Raster 之前）
     let imageData = frameImage;
