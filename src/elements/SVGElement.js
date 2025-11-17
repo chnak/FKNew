@@ -580,14 +580,38 @@ export class SVGElement extends BaseElement {
       }
       
       // 保存元素的原始状态（第一次）
+      // 注意：只在第一次保存，之后不再更新，以确保位置基准稳定
       if (!element._originalPosition) {
-        element._originalPosition = element.position ? element.position.clone() : new p.Point(0, 0);
+        // 保存当前实际位置作为原始位置
+        const currentPos = element.position ? element.position.clone() : new p.Point(0, 0);
+        element._originalPosition = currentPos;
       }
       if (!element._originalScaling) {
         element._originalScaling = element.scaling ? element.scaling.clone() : new p.Point(1, 1);
       }
       if (element._originalOpacity === undefined) {
         element._originalOpacity = element.opacity !== undefined ? element.opacity : 1;
+      }
+      
+      // 确保元素位置始终基于原始位置（防止被其他操作改变）
+      // 如果当前没有应用 x/y 动画，保持原始位置
+      // 注意：这个检查需要在获取 props 之前进行，所以先检查动画配置类型
+      const hasPositionAnimation = typeof animationConfig === 'function' 
+        ? false // 函数类型需要调用后才能知道，这里先假设没有
+        : (typeof animationConfig === 'object' && (typeof animationConfig.x === 'number' || typeof animationConfig.y === 'number'));
+      
+      if (!hasPositionAnimation && element._originalPosition && element.position) {
+        // 检查位置是否被意外改变（允许小的浮点误差）
+        const currentPos = element.position;
+        const origPos = element._originalPosition;
+        const distance = Math.sqrt(
+          Math.pow(currentPos.x - origPos.x, 2) + 
+          Math.pow(currentPos.y - origPos.y, 2)
+        );
+        // 如果位置偏差超过 1 像素，可能是被意外改变了，需要恢复
+        if (distance > 1) {
+          element.position = element._originalPosition.clone();
+        }
       }
       
       let props;
@@ -618,6 +642,24 @@ export class SVGElement extends BaseElement {
       
       // 应用属性（传递 paperInstance）
       this._applyPropertiesToElement(element, props, time, paperInstance);
+      
+      // 应用属性后，如果动画没有改变位置，确保位置保持原始值
+      // 这样可以防止在设置 visible 或其他属性时位置被意外改变
+      if (typeof props.x !== 'number' && typeof props.y !== 'number') {
+        if (element._originalPosition && element.position) {
+          // 检查位置是否被意外改变（允许小的浮点误差）
+          const currentPos = element.position;
+          const origPos = element._originalPosition;
+          const distance = Math.sqrt(
+            Math.pow(currentPos.x - origPos.x, 2) + 
+            Math.pow(currentPos.y - origPos.y, 2)
+          );
+          // 如果位置偏差超过 1 像素，可能是被意外改变了，需要恢复
+          if (distance > 1) {
+            element.position = element._originalPosition.clone();
+          }
+        }
+      }
     }
   }
 
@@ -666,7 +708,54 @@ export class SVGElement extends BaseElement {
     
     // 不透明度
     if (typeof props.opacity === 'number') {
-      element.opacity = Math.max(0, Math.min(1, props.opacity));
+      const opacity = Math.max(0, Math.min(1, props.opacity));
+      
+      // 保存当前位置，防止在设置 visible 时位置被改变
+      const savedPosition = element.position ? element.position.clone() : null;
+      
+      // 对于 Group 元素，设置 visible 和 opacity
+      // 注意：在 Paper.js 中，Group 的 visible=false 会隐藏所有子元素
+      // 但是我们需要确保子元素也被正确设置
+      if (opacity === 0) {
+        // 隐藏元素及其所有子元素
+        element.visible = false;
+        element.opacity = 0;
+        // 递归设置所有子元素
+        if (element.children && element.children.length > 0) {
+          const hideChildren = (item) => {
+            if (item.children && item.children.length > 0) {
+              for (const child of item.children) {
+                child.visible = false;
+                child.opacity = 0;
+                hideChildren(child);
+              }
+            }
+          };
+          hideChildren(element);
+        }
+      } else {
+        // 显示元素
+        element.visible = true;
+        element.opacity = opacity;
+        // 递归设置所有子元素
+        if (element.children && element.children.length > 0) {
+          const showChildren = (item) => {
+            if (item.children && item.children.length > 0) {
+              for (const child of item.children) {
+                child.visible = true;
+                child.opacity = opacity;
+                showChildren(child);
+              }
+            }
+          };
+          showChildren(element);
+        }
+      }
+      
+      // 恢复位置，防止在设置 visible 时位置被改变
+      if (savedPosition) {
+        element.position = savedPosition;
+      }
     }
     
     // 填充颜色
