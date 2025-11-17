@@ -13,6 +13,7 @@ import { AudioElement } from '../elements/AudioElement.js';
 import { SubtitleElement } from '../elements/SubtitleElement.js';
 import { OscilloscopeElement } from '../elements/OscilloscopeElement.js';
 import { LRCSubtitleBuilder } from '../utils/lrcSubtitleBuilder.js';
+import { Component } from './Component.js';
 
 /**
  * 场景类 - 直接返回元素实例数组，不使用 CompositionElement
@@ -29,6 +30,7 @@ export class Scene {
     
     this.elements = [];
     this.backgroundLayer = null;
+    this.components = []; // 组件列表
   }
 
   /**
@@ -291,6 +293,25 @@ export class Scene {
   }
 
   /**
+   * 添加组件
+   * @param {Component|Object} component - 组件实例或组件配置
+   * @returns {Scene} 返回自身以支持链式调用
+   */
+  addComponent(component) {
+    // 如果传入的是配置对象，创建组件实例
+    if (!(component instanceof Component)) {
+      component = new Component(component);
+    }
+    
+    // 设置父容器引用
+    component.parent = this;
+    component.parentType = 'scene';
+    
+    this.components.push(component);
+    return this;
+  }
+
+  /**
    * 获取所有元素
    * @returns {Array}
    */
@@ -326,6 +347,17 @@ export class Scene {
           }
         } catch (err) {
           console.warn(`[Scene] 元素 ${element.type} 初始化失败:`, err);
+        }
+      }
+    }
+    
+    // 初始化所有组件
+    for (const component of this.components) {
+      if (component && typeof component.initialize === 'function') {
+        try {
+          await component.initialize();
+        } catch (err) {
+          console.warn(`[Scene] 组件 ${component.name} 初始化失败:`, err);
         }
       }
     }
@@ -369,6 +401,19 @@ export class Scene {
           element.endTime = element.startTime + element.duration;
         }
         elementInstances.push(element);
+      }
+    }
+
+    // 添加所有组件的元素（组件会将其内部元素转换为绝对坐标）
+    // 注意：组件 build 返回的元素时间已经是绝对时间（相对于视频开始），不需要再次转换
+    for (const component of this.components) {
+      if (component && component.visible) {
+        const componentElements = component.build(sceneStartTime, this.width, this.height);
+        // 标记这些元素来自组件，时间已经是绝对时间
+        for (const element of componentElements) {
+          element._fromComponent = true;
+        }
+        elementInstances.push(...componentElements);
       }
     }
 
@@ -464,6 +509,14 @@ export class Scene {
     }
     this.elements = [];
     this.backgroundLayer = null;
+    
+    // 销毁所有组件
+    for (const component of this.components) {
+      if (component.destroy) {
+        component.destroy();
+      }
+    }
+    this.components = [];
   }
 }
 

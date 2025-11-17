@@ -42,18 +42,19 @@ export { ImageLoader, imageLoader } from './utils/image-loader.js';
 export * from './types/enums.js';
 export * from './types/constants.js';
 
+// 构建器类
+export { VideoBuilder } from './builder/VideoBuilder.js';
+export { Track } from './builder/Track.js';
+export { Scene } from './builder/Scene.js';
+export { Component } from './builder/Component.js';
+export { Transition } from './builder/Transition.js';
+
 // 工具函数
 export * from './utils/helpers.js';
 export * from './utils/validator.js';
 export * from './utils/unit-converter.js';
 export { parseSubtitles, calculateMixedTextCapacity, calculateSpeechTimeMixed } from './utils/subtitle-utils.js';
 export { getAudioDuration } from './utils/audio-utils.js';
-
-// 构建器类（高级API）
-export { VideoBuilder } from './builder/VideoBuilder.js';
-export { Track } from './builder/Track.js';
-export { Scene } from './builder/Scene.js';
-export { Transition } from './builder/Transition.js';
 
 // 转场相关
 export { TransitionRenderer, AllTransitions } from './utils/transition-renderer.js';

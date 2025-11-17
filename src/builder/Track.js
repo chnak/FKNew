@@ -3,6 +3,7 @@
  */
 import { Scene } from './Scene.js';
 import { Transition } from './Transition.js';
+import { Component } from './Component.js';
 
 /**
  * 轨道类 - 直接创建 Layer 并添加元素，不使用 CompositionElement
@@ -17,6 +18,7 @@ export class Track {
     this.fps = config.fps || config.builder?.config?.fps || 30;
     this.scenes = [];
     this.transitions = []; // 场景之间的转场效果
+    this.components = []; // 组件列表
   }
 
   /**
@@ -82,6 +84,25 @@ export class Track {
   }
 
   /**
+   * 添加组件
+   * @param {Component|Object} component - 组件实例或组件配置
+   * @returns {Track} 返回自身以支持链式调用
+   */
+  addComponent(component) {
+    // 如果传入的是配置对象，创建组件实例
+    if (!(component instanceof Component)) {
+      component = new Component(component);
+    }
+    
+    // 设置父容器引用
+    component.parent = this;
+    component.parentType = 'track';
+    
+    this.components.push(component);
+    return this;
+  }
+
+  /**
    * 初始化轨道（预加载需要异步加载的元素）
    * @returns {Promise<void>}
    */
@@ -90,6 +111,17 @@ export class Track {
     for (const scene of this.scenes) {
       if (scene.initialize) {
         await scene.initialize();
+      }
+    }
+    
+    // 初始化所有组件
+    for (const component of this.components) {
+      if (component && typeof component.initialize === 'function') {
+        try {
+          await component.initialize();
+        } catch (err) {
+          console.warn(`[Track] 组件 ${component.name} 初始化失败:`, err);
+        }
       }
     }
   }
@@ -128,50 +160,35 @@ export class Track {
       
       // 将所有元素添加到 Layer 或 VideoMaker（音频元素特殊处理）
       for (const element of sceneElements) {
-        // 设置元素的绝对时间（相对于视频开始）
-        const relativeStartTime = element.startTime || 0;
-        const absoluteStartTime = sceneStartTime + relativeStartTime;
-        
-        // 如果是分割文本，需要在更新父元素的 startTime 之前保存相对开始时间
-        const parentRelativeStartTime = relativeStartTime;
-        
-        element.startTime = absoluteStartTime;
-        
-        // 更新元素的 endTime（基于绝对时间）
-        if (element.duration !== undefined) {
-          element.endTime = absoluteStartTime + element.duration;
-        } else if (element.endTime !== Infinity) {
-          // 如果 endTime 不是 Infinity，也需要转换为绝对时间
-          element.endTime = sceneStartTime + (element.endTime - relativeStartTime);
-        }
-        
-        // 音频元素需要添加到 VideoMaker 的 audioElements 数组，而不是 Layer
-        if (element.type === 'audio') {
-          // 更新音频元素的开始时间
-          if (element.audioStartTime === undefined) {
-            element.audioStartTime = 0;
-          }
-          videoMaker.addAudio(element);
+        // 如果元素来自组件，时间已经是绝对时间，不需要再次转换
+        if (element._fromComponent) {
+          // 元素时间已经是绝对时间，直接使用
+          delete element._fromComponent; // 清理标记
         } else {
-          // 设置元素的 canvasWidth 和 canvasHeight
-          element.canvasWidth = videoMaker.width;
-          element.canvasHeight = videoMaker.height;
+          // 设置元素的绝对时间（相对于视频开始）
+          const relativeStartTime = element.startTime || 0;
+          const absoluteStartTime = sceneStartTime + relativeStartTime;
           
-          // 如果是分割文本，也需要设置子元素的 canvasWidth 和 canvasHeight，并更新时间
+          // 如果是分割文本，需要在更新父元素的 startTime 之前保存相对开始时间
+          const parentRelativeStartTime = relativeStartTime;
+          
+          element.startTime = absoluteStartTime;
+          
+          // 更新元素的 endTime（基于绝对时间）
+          if (element.duration !== undefined) {
+            element.endTime = absoluteStartTime + element.duration;
+          } else if (element.endTime !== Infinity) {
+            // 如果 endTime 不是 Infinity，也需要转换为绝对时间
+            element.endTime = sceneStartTime + (element.endTime - relativeStartTime);
+          }
+          
+          // 处理分割文本的时间转换
           if (element.type === 'text' && element.segments && element.segments.length > 0) {
-            
             for (const segment of element.segments) {
-              segment.canvasWidth = videoMaker.width;
-              segment.canvasHeight = videoMaker.height;
-              
               // 更新子片段的绝对时间（相对于视频开始）
-              // 子片段的 startTime 在 _initializeSplitter 中是基于父元素的相对 startTime 计算的
-              // 格式：segmentStartTime = parentStartTime + index * splitDelay
-              // 其中 parentStartTime 是父元素相对于场景的开始时间
-              // 所以子片段的相对开始时间 = 父元素的相对开始时间 + 偏移
               const segmentRelativeStartTime = segment.startTime || 0;
               
-              // 计算子片段相对于父元素的偏移时间（在父元素更新为绝对时间之前计算）
+              // 计算子片段相对于父元素的偏移时间
               const segmentOffset = segmentRelativeStartTime - parentRelativeStartTime;
               
               // 子片段的绝对时间 = 父元素的绝对时间 + 子片段相对于父元素的偏移
@@ -189,6 +206,28 @@ export class Track {
               }
             }
           }
+        }
+        
+        // 音频元素需要添加到 VideoMaker 的 audioElements 数组，而不是 Layer
+        if (element.type === 'audio') {
+          // 更新音频元素的开始时间
+          if (element.audioStartTime === undefined) {
+            element.audioStartTime = 0;
+          }
+          videoMaker.addAudio(element);
+        } else {
+          // 设置元素的 canvasWidth 和 canvasHeight
+          element.canvasWidth = videoMaker.width;
+          element.canvasHeight = videoMaker.height;
+          
+          // 如果是分割文本，也需要设置子元素的 canvasWidth 和 canvasHeight
+          // 注意：分割文本的时间转换已经在上面处理了（对于非组件元素）
+          if (element.type === 'text' && element.segments && element.segments.length > 0) {
+            for (const segment of element.segments) {
+              segment.canvasWidth = videoMaker.width;
+              segment.canvasHeight = videoMaker.height;
+            }
+          }
           
           // 其他元素添加到 Layer
           layer.addElement(element);
@@ -199,6 +238,50 @@ export class Track {
       
       // 处理转场（暂时跳过，转场需要特殊处理）
       // TODO: 转场效果需要重新设计
+    }
+    
+    // 添加所有组件的元素（组件会将其内部元素转换为绝对坐标）
+    for (const component of this.components) {
+      if (component && component.visible) {
+        // 计算组件的绝对开始时间
+        const componentAbsoluteStartTime = component.startTime !== undefined ? component.startTime : currentTime;
+        const componentElements = component.build(componentAbsoluteStartTime, this.width, this.height);
+        
+        // 将所有元素添加到 Layer
+        for (const element of componentElements) {
+          // 设置元素的 canvasWidth 和 canvasHeight
+          element.canvasWidth = videoMaker.width;
+          element.canvasHeight = videoMaker.height;
+          
+          // 如果是分割文本，也需要设置子元素的 canvas 尺寸
+          if (element.type === 'text' && element.segments && element.segments.length > 0) {
+            for (const segment of element.segments) {
+              segment.canvasWidth = videoMaker.width;
+              segment.canvasHeight = videoMaker.height;
+              
+              // 更新子片段的绝对时间
+              const segmentRelativeStartTime = segment.startTime || 0;
+              const segmentOffset = segmentRelativeStartTime - (element.startTime - componentAbsoluteStartTime);
+              segment.startTime = componentAbsoluteStartTime + segmentOffset;
+              
+              if (segment.duration !== undefined) {
+                segment.endTime = segment.startTime + segment.duration;
+              }
+            }
+          }
+          
+          // 音频元素需要添加到 VideoMaker 的 audioElements 数组
+          if (element.type === 'audio') {
+            if (element.audioStartTime === undefined) {
+              element.audioStartTime = 0;
+            }
+            videoMaker.addAudio(element);
+          } else {
+            // 其他元素添加到 Layer
+            layer.addElement(element);
+          }
+        }
+      }
     }
 
     return layer;
@@ -213,6 +296,14 @@ export class Track {
     }
     this.scenes = [];
     this.transitions = [];
+    
+    // 销毁所有组件
+    for (const component of this.components) {
+      if (component.destroy) {
+        component.destroy();
+      }
+    }
+    this.components = [];
   }
 }
 

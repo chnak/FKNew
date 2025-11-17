@@ -41,7 +41,7 @@ export class VideoExporter {
       usePipe=true,
       endTime = composition.timeline.duration,
       parallel = false, // 是否使用 Worker 并行渲染
-      maxWorkers = null, // 最大 Worker 数，默认根据 CPU 核心数
+      maxWorkers = 2, // 最大 Worker 数，默认根据 CPU 核心数
     } = options;
 
     // 确保输出目录存在
@@ -1440,6 +1440,7 @@ export class VideoExporter {
           obj.constructor.name === 'VideoBuilder' ||
           obj.constructor.name === 'Track' ||
           obj.constructor.name === 'Scene' ||
+          obj.constructor.name === 'Component' ||
           obj.constructor.name === 'VideoMaker' ||
           obj.constructor.name === 'Timeline'
         )) {
@@ -1462,11 +1463,12 @@ export class VideoExporter {
             // 检查值的类型，跳过不应该序列化的对象
             const value = obj[key];
             if (value && typeof value === 'object') {
-              // 跳过 VideoBuilder、Track、Scene 等构建器对象
+              // 跳过 VideoBuilder、Track、Scene、Component 等构建器对象
               if (value.constructor && (
                 value.constructor.name === 'VideoBuilder' ||
                 value.constructor.name === 'Track' ||
                 value.constructor.name === 'Scene' ||
+                value.constructor.name === 'Component' ||
                 value.constructor.name === 'VideoMaker' ||
                 value.constructor.name === 'Timeline'
               )) {
