@@ -1370,12 +1370,14 @@ async function createDemoVideo() {
   }
 
   // 导出视频
-  const outputPath = path.join(__dirname, '../output/demo-video.mp4');
+  const outputPath = path.join(__dirname, '../output/demo-video1.mp4');
   console.log('\n🎬 开始导出视频...');
   console.log(`输出路径: ${outputPath}\n`);
 
   await builder.export(outputPath, {
     usePipe: true,
+    parallel: true,
+    maxWorkers: 4,
   });
 
   console.log('\n✅ 演示视频创建完成！');

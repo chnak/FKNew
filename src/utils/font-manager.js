@@ -17,6 +17,18 @@ const DEFAULT_FONT_FAMILY = 'PatuaOne'; // 使用无空格的字体名称
 const registeredFonts = new Map();
 
 /**
+ * 获取所有已注册的字体信息
+ * @returns {Array<{fontFamily: string, path: string, options: Object}>}
+ */
+export function getRegisteredFonts() {
+  return Array.from(registeredFonts.entries()).map(([fontFamily, info]) => ({
+    fontFamily,
+    path: info.path,
+    options: info.options,
+  }));
+}
+
+/**
  * 注册字体
  * @param {string} fontPath - 字体文件路径
  * @param {string} fontFamily - 字体族名称
@@ -84,9 +96,9 @@ export function isFontRegistered(fontFamily) {
 }
 
 /**
- * 获取已注册的字体列表
+ * 获取已注册的字体名称列表（仅返回名称）
  */
-export function getRegisteredFonts() {
+export function getRegisteredFontNames() {
   return Array.from(registeredFonts.keys());
 }
 
