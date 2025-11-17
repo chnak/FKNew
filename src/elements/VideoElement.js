@@ -190,8 +190,12 @@ export class VideoElement extends BaseElement {
       this.finalWidth = finalWidth;
       this.finalHeight = finalHeight;
 
-      // 如果启用循环，先缓冲所有帧
-      if (this.loop) {
+      // 性能优化：在并行渲染时，为了支持随机访问，需要缓冲所有帧
+      // 如果启用循环，或者视频时长较短（小于60秒），先缓冲所有帧
+      const shouldBuffer = this.loop || (this.videoInfo.duration > 0 && this.videoInfo.duration < 60);
+      
+      if (shouldBuffer) {
+        console.log(`[VideoElement] 缓冲视频帧（${this.videoInfo.duration.toFixed(2)}秒）...`);
         while (true) {
           const { value, done } = await this.frameIterator.next();
           if (done) break;
@@ -199,6 +203,7 @@ export class VideoElement extends BaseElement {
             this.frameBuffer.push(Buffer.from(value));
           }
         }
+        console.log(`[VideoElement] 视频帧缓冲完成，共 ${this.frameBuffer.length} 帧`);
       }
 
       // 如果不禁音，提取视频中的音频
@@ -254,22 +259,33 @@ export class VideoElement extends BaseElement {
     try {
       let rgba;
 
-      if (this.loop && this.frameBuffer.length > 0) {
-        // 循环模式：从缓冲的帧中获取
-        const frameIndex = Math.floor(progress * this.frameBuffer.length) % this.frameBuffer.length;
+      // 如果已缓冲帧，从缓冲区中根据 progress 获取
+      if (this.frameBuffer.length > 0) {
+        // 根据 progress 计算帧索引
+        let frameIndex = Math.floor(progress * this.frameBuffer.length);
+        
+        // 确保索引在有效范围内
+        frameIndex = Math.max(0, Math.min(frameIndex, this.frameBuffer.length - 1));
+        
+        // 如果是循环模式，使用模运算
+        if (this.loop) {
+          frameIndex = frameIndex % this.frameBuffer.length;
+        }
+        
         rgba = this.frameBuffer[frameIndex];
       } else {
-        // 正常模式：从迭代器获取
+        // 未缓冲模式：从迭代器顺序获取（不推荐用于并行渲染）
+        // 注意：这种方式在并行渲染时会导致帧顺序错乱
         try {
           const { value, done } = await this.frameIterator.next();
           if (done) {
-            // 如果迭代器结束，尝试重新初始化（可能是视频较短）
+            // 如果迭代器结束，返回 null
             return null;
           }
           rgba = value ? Buffer.from(value) : null;
         } catch (err) {
           // 迭代器错误，可能是流已关闭
-          console.warn('Frame iterator error:', err.message);
+          console.warn('[VideoElement] Frame iterator error:', err.message);
           return null;
         }
       }
