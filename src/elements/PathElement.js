@@ -118,11 +118,19 @@ export class PathElement extends BaseElement {
 
   /**
    * 渲染路径元素（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  render(layer, time) {
+  render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
 
-    const viewSize = paper.view.viewSize;
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { width: viewSize.width, height: viewSize.height };
     const state = this.getStateAtTime(time, context);
 
@@ -145,11 +153,11 @@ export class PathElement extends BaseElement {
     
     if (this.bezier && normalizedPoints.length >= 4) {
       // 贝塞尔曲线路径
-      path = new paper.Path();
+      path = new p.Path();
       
       // 第一个点作为起点
       const firstPoint = normalizedPoints[0];
-      path.moveTo(new paper.Point(
+      path.moveTo(new p.Point(
         x + firstPoint.x - (this.width || 0) * anchor[0],
         y + firstPoint.y - (this.height || 0) * anchor[1]
       ));
@@ -162,15 +170,15 @@ export class PathElement extends BaseElement {
           const end = normalizedPoints[i + 2];
           
           path.cubicCurveTo(
-            new paper.Point(
+            new p.Point(
               x + cp1.x - (this.width || 0) * anchor[0],
               y + cp1.y - (this.height || 0) * anchor[1]
             ),
-            new paper.Point(
+            new p.Point(
               x + cp2.x - (this.width || 0) * anchor[0],
               y + cp2.y - (this.height || 0) * anchor[1]
             ),
-            new paper.Point(
+            new p.Point(
               x + end.x - (this.width || 0) * anchor[0],
               y + end.y - (this.height || 0) * anchor[1]
             )
@@ -179,11 +187,11 @@ export class PathElement extends BaseElement {
       }
     } else {
       // 普通路径
-      path = new paper.Path();
+      path = new p.Path();
       
       for (let i = 0; i < normalizedPoints.length; i++) {
         const point = normalizedPoints[i];
-        const paperPoint = new paper.Point(
+        const paperPoint = new p.Point(
           x + point.x - (this.width || 0) * anchor[0],
           y + point.y - (this.height || 0) * anchor[1]
         );
@@ -232,8 +240,8 @@ export class PathElement extends BaseElement {
     // 保存 Paper.js 项目引用（用于 onFrame 回调）
     this._paperItem = path;
     
-    // 调用 onRender 回调，传递 Paper.js 项目引用
-    this._callOnRender(time, path);
+    // 调用 onRender 回调，传递 Paper.js 项目引用和 paperInstance
+    this._callOnRender(time, path, paperInstance);
     
     return path;
   }

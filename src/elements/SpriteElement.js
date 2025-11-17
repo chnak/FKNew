@@ -34,11 +34,19 @@ export class SpriteElement extends BaseElement {
   /**
    * 渲染 Sprite 元素（使用 Paper.js）
    * 注意：SpriteElement 在 Paper.js 中可能需要根据 spriteType 创建不同的元素
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  render(layer, time) {
+  render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
 
-    const viewSize = paper.view.viewSize;
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { width: viewSize.width, height: viewSize.height };
     const state = this.getStateAtTime(time, context);
 
@@ -58,20 +66,20 @@ export class SpriteElement extends BaseElement {
     let item;
     switch (this.spriteType) {
       case 'Rect':
-        item = new paper.Path.Rectangle({
-          rectangle: new paper.Rectangle(x - width * 0.5, y - height * 0.5, width, height),
+        item = new p.Path.Rectangle({
+          rectangle: new p.Rectangle(x - width * 0.5, y - height * 0.5, width, height),
         });
         break;
       case 'Circle':
-        item = new paper.Path.Circle({
-          center: new paper.Point(x, y),
+        item = new p.Path.Circle({
+          center: new p.Point(x, y),
           radius: Math.min(width, height) / 2,
         });
         break;
       default:
         // 默认创建矩形
-        item = new paper.Path.Rectangle({
-          rectangle: new paper.Rectangle(x - width * 0.5, y - height * 0.5, width, height),
+        item = new p.Path.Rectangle({
+          rectangle: new p.Rectangle(x - width * 0.5, y - height * 0.5, width, height),
         });
     }
 
@@ -79,7 +87,8 @@ export class SpriteElement extends BaseElement {
 
     // 使用统一的变换方法应用动画
     this.applyTransform(item, state, {
-      pivot: new paper.Point(x, y), // 使用中心作为变换中心
+      pivot: new p.Point(x, y), // 使用中心作为变换中心
+      paperInstance: paperInstance,
     });
 
     layer.addChild(item);

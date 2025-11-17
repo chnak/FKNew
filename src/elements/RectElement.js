@@ -44,8 +44,11 @@ export class RectElement extends BaseElement {
 
   /**
    * 渲染矩形元素（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  render(layer, time) {
+  render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
     
     // 检查时间范围
@@ -53,8 +56,13 @@ export class RectElement extends BaseElement {
       return null;
     }
 
-    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 paper.view.viewSize
-    const viewSize = paper.view.viewSize;
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
+    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 project.view.viewSize
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { 
       width: this.canvasWidth || viewSize.width, 
       height: this.canvasHeight || viewSize.height 
@@ -78,33 +86,33 @@ export class RectElement extends BaseElement {
     if (state.borderRadius > 0) {
       // 圆角矩形 - Paper.js 需要手动创建圆角路径
       const r = Math.min(state.borderRadius, width / 2, height / 2);
-      const path = new paper.Path();
+      const path = new p.Path();
       
       // 创建圆角矩形路径（顺时针）
       // 从左上角开始
-      path.moveTo(new paper.Point(rectX + r, rectY));
+      path.moveTo(new p.Point(rectX + r, rectY));
       // 上边
-      path.lineTo(new paper.Point(rectX + width - r, rectY));
+      path.lineTo(new p.Point(rectX + width - r, rectY));
       // 右上角圆弧
-      path.arcTo(new paper.Point(rectX + width, rectY + r));
+      path.arcTo(new p.Point(rectX + width, rectY + r));
       // 右边
-      path.lineTo(new paper.Point(rectX + width, rectY + height - r));
+      path.lineTo(new p.Point(rectX + width, rectY + height - r));
       // 右下角圆弧
-      path.arcTo(new paper.Point(rectX + width - r, rectY + height));
+      path.arcTo(new p.Point(rectX + width - r, rectY + height));
       // 下边
-      path.lineTo(new paper.Point(rectX + r, rectY + height));
+      path.lineTo(new p.Point(rectX + r, rectY + height));
       // 左下角圆弧
-      path.arcTo(new paper.Point(rectX, rectY + height - r));
+      path.arcTo(new p.Point(rectX, rectY + height - r));
       // 左边
-      path.lineTo(new paper.Point(rectX, rectY + r));
+      path.lineTo(new p.Point(rectX, rectY + r));
       // 左上角圆弧
-      path.arcTo(new paper.Point(rectX + r, rectY));
+      path.arcTo(new p.Point(rectX + r, rectY));
       path.closePath();
       rect = path;
     } else {
       // 普通矩形
-      rect = new paper.Path.Rectangle({
-        rectangle: new paper.Rectangle(rectX, rectY, width, height),
+      rect = new p.Path.Rectangle({
+        rectangle: new p.Rectangle(rectX, rectY, width, height),
       });
     }
 
@@ -128,15 +136,16 @@ export class RectElement extends BaseElement {
     } else {
       // 有动画或需要设置透明度，使用统一的变换方法
       this.applyTransform(rect, state, {
-        pivot: new paper.Point(x, y), // 使用矩形中心作为变换中心
+        pivot: new p.Point(x, y), // 使用矩形中心作为变换中心
+        paperInstance: paperInstance,
       });
     }
 
     // 添加到 layer
     layer.addChild(rect);
     
-    // 调用 onRender 回调
-    this._callOnRender(time);
+    // 调用 onRender 回调（传递 paperItem 和 paperInstance）
+    this._callOnRender(time, rect, paperInstance);
     
     return rect;
   }

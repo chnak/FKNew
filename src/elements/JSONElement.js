@@ -70,8 +70,8 @@ export class JSONElement extends BaseElement {
       this.loaded = true;
       this.loading = false;
       
-      // 调用 onLoaded 回调
-      this._callOnLoaded(this.startTime || 0);
+      // 调用 onLoaded 回调（注意：此时还没有 paperItem，所以传递 null）
+      this._callOnLoaded(this.startTime || 0, null, null);
     } catch (error) {
       this.loading = false;
       console.error('[JSONElement] 加载 JSON 失败:', error);
@@ -97,8 +97,11 @@ export class JSONElement extends BaseElement {
 
   /**
    * 渲染 JSON 元素（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  async render(layer, time) {
+  async render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
 
     // 检查时间范围
@@ -115,8 +118,13 @@ export class JSONElement extends BaseElement {
       return null;
     }
 
-    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 paper.view.viewSize
-    const viewSize = paper.view.viewSize;
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
+    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 project.view.viewSize
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { 
       width: this.canvasWidth || viewSize.width, 
       height: this.canvasHeight || viewSize.height 
@@ -147,10 +155,10 @@ export class JSONElement extends BaseElement {
       
       // 检查 JSON 数据的格式
       // Paper.js JSON 格式通常包含 children 数组或其他项目数据
-      if (typeof paper.project.importJSON === 'function') {
+      if (typeof project.importJSON === 'function') {
         try {
           // 方法1：使用 importJSON（如果可用）
-          jsonItem = paper.project.importJSON(this.jsonData);
+          jsonItem = project.importJSON(this.jsonData);
           // 验证返回的对象是否是有效的 Paper.js 项目
           if (!jsonItem || typeof jsonItem._remove !== 'function') {
             jsonItem = null;
@@ -166,19 +174,19 @@ export class JSONElement extends BaseElement {
         if (this.jsonData.children && Array.isArray(this.jsonData.children)) {
           // 方法2：手动创建项目（如果 importJSON 不可用）
           // 尝试从 JSON 数据中恢复项目
-          jsonItem = this._createItemFromJSON(this.jsonData);
+          jsonItem = this._createItemFromJSON(this.jsonData, paperInstance);
         } else if (this.jsonData.svg) {
           // 方法3：如果 JSON 包含 SVG 数据，使用 SVG 导入
-          if (typeof paper.project.importSVG === 'function') {
+          if (typeof project.importSVG === 'function') {
             try {
-              jsonItem = paper.project.importSVG(this.jsonData.svg);
+              jsonItem = project.importSVG(this.jsonData.svg);
             } catch (e) {
               console.warn('[JSONElement] SVG 导入失败:', e.message);
             }
           }
         } else {
           // 方法4：尝试直接创建路径（如果 JSON 包含路径数据）
-          jsonItem = this._createItemFromJSON(this.jsonData);
+          jsonItem = this._createItemFromJSON(this.jsonData, paperInstance);
         }
       }
 
@@ -255,11 +263,12 @@ export class JSONElement extends BaseElement {
       const itemX = rectX + width * anchor[0] - scaledWidth * 0.5;
       const itemY = rectY + height * anchor[1] - scaledHeight * 0.5;
 
-      jsonItem.position = new paper.Point(itemX + scaledWidth / 2, itemY + scaledHeight / 2);
+      jsonItem.position = new p.Point(itemX + scaledWidth / 2, itemY + scaledHeight / 2);
 
       // 应用变换（旋转、缩放等，位置已经设置了）
       this.applyTransform(jsonItem, state, {
         applyPosition: false, // 位置已经设置了
+        paperInstance: paperInstance,
       });
 
       // 添加到 layer
@@ -268,8 +277,8 @@ export class JSONElement extends BaseElement {
       // 保存引用以便后续清理
       this.jsonItem = jsonItem;
 
-      // 调用 onRender 回调
-      this._callOnRender(time);
+      // 调用 onRender 回调（传递 paperItem 和 paperInstance）
+      this._callOnRender(time, jsonItem, paperInstance);
 
       return jsonItem;
     } catch (error) {
@@ -281,19 +290,24 @@ export class JSONElement extends BaseElement {
   /**
    * 从 JSON 数据创建 Paper.js 项目（辅助方法）
    * 支持 Paper.js JSON 格式和简化的路径格式
+   * @param {Object} jsonData - JSON 数据
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _createItemFromJSON(jsonData) {
+  _createItemFromJSON(jsonData, paperInstance = null) {
     if (!jsonData || typeof jsonData !== 'object') {
       return null;
     }
     
+    // 获取 Paper.js 实例
+    const { paper: p } = this.getPaperInstance(paperInstance);
+    
     // 如果包含 children 数组，创建 Group
     if (jsonData.children && Array.isArray(jsonData.children)) {
-      const group = new paper.Group();
+      const group = new p.Group();
       
       // 递归处理子元素
       for (const childData of jsonData.children) {
-        const childItem = this._createItemFromJSON(childData);
+        const childItem = this._createItemFromJSON(childData, paperInstance);
         if (childItem && typeof childItem._remove === 'function') {
           group.addChild(childItem);
         }
@@ -310,12 +324,12 @@ export class JSONElement extends BaseElement {
     
     // 如果包含 className 和 data，尝试创建对应的 Paper.js 对象
     if (jsonData.className && jsonData.data) {
-      return this._createItemFromClassData(jsonData.className, jsonData.data);
+      return this._createItemFromClassData(jsonData.className, jsonData.data, paperInstance);
     }
     
     // 如果包含 segments 或 points，创建路径
     if (jsonData.segments || jsonData.points) {
-      return this._createPathFromData(jsonData);
+      return this._createPathFromData(jsonData, paperInstance);
     }
     
     return null;
@@ -323,15 +337,21 @@ export class JSONElement extends BaseElement {
 
   /**
    * 根据 className 和 data 创建 Paper.js 对象
+   * @param {string} className - 类名
+   * @param {Object} data - 数据
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _createItemFromClassData(className, data) {
+  _createItemFromClassData(className, data, paperInstance = null) {
+    // 获取 Paper.js 实例
+    const { paper: p } = this.getPaperInstance(paperInstance);
+    
     if (className === 'Path' || className === 'path') {
-      return this._createPathFromData(data);
+      return this._createPathFromData(data, paperInstance);
     } else if (className === 'Group' || className === 'group') {
       if (data.children && Array.isArray(data.children)) {
-        const group = new paper.Group();
+        const group = new p.Group();
         for (const childData of data.children) {
-          const childItem = this._createItemFromJSON(childData);
+          const childItem = this._createItemFromJSON(childData, paperInstance);
           if (childItem && typeof childItem._remove === 'function') {
             group.addChild(childItem);
           }
@@ -340,21 +360,21 @@ export class JSONElement extends BaseElement {
       }
     } else if (className === 'Circle' || className === 'circle') {
       if (data.center && data.radius) {
-        const center = new paper.Point(data.center[0] || data.center.x, data.center[1] || data.center.y);
-        const circle = new paper.Path.Circle(center, data.radius);
+        const center = new p.Point(data.center[0] || data.center.x, data.center[1] || data.center.y);
+        const circle = new p.Path.Circle(center, data.radius);
         this._applyStyleToItem(circle, data);
         return circle;
       }
     } else if (className === 'Rectangle' || className === 'rect') {
       if (data.rectangle || data.rect) {
         const rect = data.rectangle || data.rect;
-        const rectangle = new paper.Rectangle(
+        const rectangle = new p.Rectangle(
           rect.x || rect[0] || 0,
           rect.y || rect[1] || 0,
           rect.width || rect[2] || 100,
           rect.height || rect[3] || 100
         );
-        const path = new paper.Path.Rectangle(rectangle);
+        const path = new p.Path.Rectangle(rectangle);
         this._applyStyleToItem(path, data);
         return path;
       }
@@ -365,21 +385,26 @@ export class JSONElement extends BaseElement {
 
   /**
    * 从数据创建路径
+   * @param {Object} data - 路径数据
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _createPathFromData(data) {
-    const path = new paper.Path();
+  _createPathFromData(data, paperInstance = null) {
+    // 获取 Paper.js 实例
+    const { paper: p } = this.getPaperInstance(paperInstance);
+    
+    const path = new p.Path();
     
     // 处理 segments 或 points
     if (data.segments && Array.isArray(data.segments)) {
       // segments 格式：[[x, y], [x, y], ...] 或 [[x, y, handleIn, handleOut], ...]
       for (const segment of data.segments) {
         if (Array.isArray(segment) && segment.length >= 2) {
-          const point = new paper.Point(segment[0], segment[1]);
+          const point = new p.Point(segment[0], segment[1]);
           if (segment.length >= 6) {
             // 有控制点
-            const handleIn = new paper.Point(segment[2], segment[3]);
-            const handleOut = new paper.Point(segment[4], segment[5]);
-            path.add(new paper.Segment(point, handleIn, handleOut));
+            const handleIn = new p.Point(segment[2], segment[3]);
+            const handleOut = new p.Point(segment[4], segment[5]);
+            path.add(new p.Segment(point, handleIn, handleOut));
           } else {
             path.add(point);
           }
@@ -390,9 +415,9 @@ export class JSONElement extends BaseElement {
       for (const pointData of data.points) {
         let point;
         if (Array.isArray(pointData)) {
-          point = new paper.Point(pointData[0], pointData[1]);
+          point = new p.Point(pointData[0], pointData[1]);
         } else if (pointData && typeof pointData.x === 'number' && typeof pointData.y === 'number') {
-          point = new paper.Point(pointData.x, pointData.y);
+          point = new p.Point(pointData.x, pointData.y);
         }
         if (point) {
           path.add(point);

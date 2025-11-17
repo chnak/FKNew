@@ -203,14 +203,22 @@ export class SubtitleElement extends BaseElement {
   /**
    * 渲染字幕元素（使用 Paper.js）
    * 注意：字幕元素需要异步初始化，所以在首次渲染时可能需要同步初始化
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  render(layer, time) {
+  render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
+
+    // 获取 Paper.js 实例
+    const { project } = this.getPaperInstance(paperInstance);
 
     // 如果未初始化，尝试同步初始化（使用视图尺寸）
     if (!this.initialized) {
       try {
-        const viewSize = paper.view.viewSize;
+        const viewSize = project && project.view && project.view.viewSize 
+          ? project.view.viewSize 
+          : { width: 1920, height: 1080 };
         const width = viewSize.width || 1920;
         const height = viewSize.height || 1080;
         // 同步初始化（如果可能）
@@ -228,7 +236,8 @@ export class SubtitleElement extends BaseElement {
       for (const textElement of this.textElements) {
         if (textElement && textElement.isActiveAtTime(time)) {
           if (typeof textElement.render === 'function') {
-            textElement.render(layer, time);
+            // 传递 paperInstance 给 TextElement
+            textElement.render(layer, time, paperInstance);
           }
         }
       }

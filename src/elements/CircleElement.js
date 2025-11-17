@@ -49,11 +49,19 @@ export class CircleElement extends BaseElement {
 
   /**
    * 渲染圆形元素（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  render(layer, time) {
+  render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
 
-    const viewSize = paper.view.viewSize;
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { width: viewSize.width, height: viewSize.height };
     const state = this.getStateAtTime(time, context);
 
@@ -73,8 +81,8 @@ export class CircleElement extends BaseElement {
     }
 
     // 创建圆形
-    const circle = new paper.Path.Circle({
-      center: new paper.Point(x, y),
+    const circle = new p.Path.Circle({
+      center: new p.Point(x, y),
       radius: radius,
     });
 
@@ -88,14 +96,15 @@ export class CircleElement extends BaseElement {
 
     // 使用统一的变换方法应用动画
     this.applyTransform(circle, state, {
-      pivot: new paper.Point(x, y), // 使用圆心作为变换中心
+      pivot: new p.Point(x, y), // 使用圆心作为变换中心
+      paperInstance: paperInstance,
     });
 
     // 添加到 layer
     layer.addChild(circle);
     
-    // 调用 onRender 回调，传递 Paper.js 项目引用
-    this._callOnRender(time, circle);
+    // 调用 onRender 回调，传递 Paper.js 项目引用和 paperInstance
+    this._callOnRender(time, circle, paperInstance);
     
     return circle;
   }

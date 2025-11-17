@@ -174,8 +174,8 @@ export class OscilloscopeElement extends BaseElement {
         
         this.loaded = true;
         
-        // 调用 onLoaded 回调
-        this._callOnLoaded(this.startTime || 0);
+        // 调用 onLoaded 回调（注意：此时还没有 paperItem，所以传递 null）
+        this._callOnLoaded(this.startTime || 0, null, null);
       } catch (error) {
         console.error(`[OscilloscopeElement] 解析音频失败:`, error.message);
         await fs.remove(tempPcmPath).catch(() => {});
@@ -266,8 +266,11 @@ export class OscilloscopeElement extends BaseElement {
 
   /**
    * 渲染示波器元素
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  async render(layer, time) {
+  async render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
     
     // 检查时间范围
@@ -291,8 +294,13 @@ export class OscilloscopeElement extends BaseElement {
       }
     }
 
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
     // 获取当前状态
-    const viewSize = paper.view.viewSize;
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { 
       width: this.canvasWidth || viewSize.width, 
       height: this.canvasHeight || viewSize.height 
@@ -344,18 +352,18 @@ export class OscilloscopeElement extends BaseElement {
 
     // 创建一个 Group 来包含示波器的背景和波形
     // 这样可以确保背景和波形在同一层级，背景不会被场景背景覆盖
-    const oscilloscopeGroup = new paper.Group();
+    const oscilloscopeGroup = new p.Group();
     if (layer) {
       layer.addChild(oscilloscopeGroup);
-    } else if (paper.project && paper.project.activeLayer) {
-      paper.project.activeLayer.addChild(oscilloscopeGroup);
+    } else if (project && project.activeLayer) {
+      project.activeLayer.addChild(oscilloscopeGroup);
     }
     
     // 绘制背景（在渲染波形之前）
     // 注意：背景必须在渲染波形之前绘制，并且要确保在 group 的最底层
     if (this.backgroundColor && this.backgroundColor !== 'transparent') {
-      const bgRect = new paper.Path.Rectangle({
-        rectangle: new paper.Rectangle(rectX, rectY, width, height),
+      const bgRect = new p.Path.Rectangle({
+        rectangle: new p.Rectangle(rectX, rectY, width, height),
         fillColor: this.backgroundColor,
         parent: oscilloscopeGroup, // 添加到 group 中
       });
@@ -368,7 +376,7 @@ export class OscilloscopeElement extends BaseElement {
     await ensureRenderersLoaded();
     
     // 获取当前 activeLayer 的子元素数量，用于在渲染后识别新创建的路径
-    const activeLayer = paper.project && paper.project.activeLayer;
+    const activeLayer = project && project.activeLayer;
     const childrenBeforeRender = activeLayer ? [...activeLayer.children] : [];
     
     // 根据样式绘制波形 - 使用动态加载的渲染器
@@ -401,8 +409,9 @@ export class OscilloscopeElement extends BaseElement {
       }
     }
 
-    // 调用 onRender 回调
-    this._callOnRender(time);
+    // 调用 onRender 回调（传递 paperItem 和 paperInstance）
+    // 注意：OscilloscopeElement 返回 null，所以传递 null 作为 paperItem
+    this._callOnRender(time, null, paperInstance);
 
     return null;
   }

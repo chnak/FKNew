@@ -206,11 +206,18 @@ export class TextElement extends BaseElement {
 
   /**
    * 渲染文本元素（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  render(layer, time) {
+  render(layer, time, paperInstance = null) {
     if (!this.visible) {
       return null;
     }
+
+    // 如果没有传入 paperInstance，尝试使用全局 paper（向后兼容）
+    const p = paperInstance ? paperInstance.paper : paper;
+    const project = paperInstance ? paperInstance.project : (paper.project || null);
 
     // 如果启用了分割，渲染所有子片段
     if (this.split && this.segments.length > 0) {
@@ -225,8 +232,8 @@ export class TextElement extends BaseElement {
       // 注意：时间调整在子片段的 render 方法中进行，这里直接传递原始时间
       for (const segment of this.segments) {
         if (segment && typeof segment.render === 'function') {
-          // 直接传递原始时间，子片段会在自己的 render 方法中调整时间
-          segment.render(layer, time);
+          // 直接传递原始时间和 paperInstance，子片段会在自己的 render 方法中调整时间
+          segment.render(layer, time, paperInstance);
         }
       }
       return null; // 分割文本不返回单个元素
@@ -238,8 +245,10 @@ export class TextElement extends BaseElement {
     }
 
     // 获取场景尺寸用于单位转换
-    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 paper.view.viewSize
-    const viewSize = paper.view && paper.view.viewSize ? paper.view.viewSize : { width: 1920, height: 1080 };
+    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 project.view.viewSize
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { 
       width: this.canvasWidth || viewSize.width, 
       height: this.canvasHeight || viewSize.height, 
@@ -289,7 +298,7 @@ export class TextElement extends BaseElement {
     }
 
     // 使用 Paper.js 的 PointText 渲染文本
-    const pointText = new paper.PointText(new paper.Point(x, y));
+    const pointText = new p.PointText(new p.Point(x, y));
     pointText.content = state.text || '';
     pointText.fontSize = fontSize;
     pointText.fontFamily = fontFamily;
@@ -331,10 +340,10 @@ export class TextElement extends BaseElement {
       const bounds = pointText.bounds;
       
       // 创建渐变
-      const gradient = new paper.Gradient();
+      const gradient = new p.Gradient();
       const stops = state.gradientColors.map((color, index) => {
-        const stop = new paper.GradientStop();
-        stop.color = new paper.Color(color);
+        const stop = new p.GradientStop();
+        stop.color = new p.Color(color);
         stop.rampPoint = index / (state.gradientColors.length - 1);
         return stop;
       });
@@ -345,19 +354,19 @@ export class TextElement extends BaseElement {
       let startPoint, endPoint;
       
       if (gradientDirection === 'vertical') {
-        startPoint = new paper.Point(bounds.x, bounds.y);
-        endPoint = new paper.Point(bounds.x, bounds.y + bounds.height);
+        startPoint = new p.Point(bounds.x, bounds.y);
+        endPoint = new p.Point(bounds.x, bounds.y + bounds.height);
       } else if (gradientDirection === 'diagonal') {
-        startPoint = new paper.Point(bounds.x, bounds.y);
-        endPoint = new paper.Point(bounds.x + bounds.width, bounds.y + bounds.height);
+        startPoint = new p.Point(bounds.x, bounds.y);
+        endPoint = new p.Point(bounds.x + bounds.width, bounds.y + bounds.height);
       } else {
         // horizontal (default)
-        startPoint = new paper.Point(bounds.x, bounds.y);
-        endPoint = new paper.Point(bounds.x + bounds.width, bounds.y);
+        startPoint = new p.Point(bounds.x, bounds.y);
+        endPoint = new p.Point(bounds.x + bounds.width, bounds.y);
       }
       
       // 创建线性渐变颜色
-      const gradientColor = new paper.Color(gradient, startPoint, endPoint);
+      const gradientColor = new p.Color(gradient, startPoint, endPoint);
       pointText.fillColor = gradientColor;
     } else {
       // 使用普通颜色
@@ -368,6 +377,7 @@ export class TextElement extends BaseElement {
     // 注意：TextElement 的位置已经在创建时通过 pointText.point 设置了，所以不需要再次应用位置
     this.applyTransform(pointText, state, {
       applyPosition: false, // 位置已经通过 pointText.point 设置了
+      paperInstance: paperInstance,
     });
 
     // 应用描边样式（使用 Paper.js 原生属性）
@@ -412,10 +422,10 @@ export class TextElement extends BaseElement {
       // 创建发光效果：使用多层阴影叠加
       // Paper.js 的 shadowBlur 和 shadowColor 可以创建发光效果
       // 为了增强发光效果，我们可以使用较大的模糊半径和较小的偏移
-      pointText.shadowColor = new paper.Color(glowColor);
+      pointText.shadowColor = new p.Color(glowColor);
       pointText.shadowColor.alpha = Math.min(glowIntensity, 1);
       pointText.shadowBlur = glowBlur;
-      pointText.shadowOffset = new paper.Point(0, 0); // 发光效果通常不需要偏移
+      pointText.shadowOffset = new p.Point(0, 0); // 发光效果通常不需要偏移
     }
     
     // 应用文本阴影效果（使用 Paper.js 原生属性）
@@ -428,7 +438,7 @@ export class TextElement extends BaseElement {
       const shadowOffsetY = state.textShadowOffsetY || 2;
       
       // 设置阴影颜色
-      pointText.shadowColor = new paper.Color(shadowColor);
+      pointText.shadowColor = new p.Color(shadowColor);
       if (state.textShadowOpacity !== undefined) {
         pointText.shadowColor.alpha = state.textShadowOpacity;
       }
@@ -437,14 +447,14 @@ export class TextElement extends BaseElement {
       pointText.shadowBlur = shadowBlur;
       
       // 设置阴影偏移
-      pointText.shadowOffset = new paper.Point(shadowOffsetX, shadowOffsetY);
+      pointText.shadowOffset = new p.Point(shadowOffsetX, shadowOffsetY);
     }
 
     // 添加到 layer
     layer.addChild(pointText);
     
-    // 调用 onRender 回调
-    this._callOnRender(time);
+    // 调用 onRender 回调（传递 paperItem 和 paperInstance）
+    this._callOnRender(time, pointText, paperInstance);
     
     return pointText;
   }

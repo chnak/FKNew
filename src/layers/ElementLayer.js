@@ -12,8 +12,11 @@ export class ElementLayer extends BaseLayer {
 
   /**
    * 渲染元素图层（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  async render(layer, time) {
+  async render(layer, time, paperInstance = null) {
     if (!this.isActiveAtTime(time)) return;
 
     // 重置已渲染元素列表
@@ -43,8 +46,8 @@ export class ElementLayer extends BaseLayer {
           
           // 使用 Paper.js 渲染
           if (typeof element.render === 'function') {
-            // 支持异步渲染
-            const result = element.render(layer, time);
+            // 支持异步渲染，传递 paperInstance 给元素
+            const result = element.render(layer, time, paperInstance);
             if (result && typeof result.then === 'function') {
               await result;
             }

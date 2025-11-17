@@ -122,8 +122,11 @@ export class SVGElement extends BaseElement {
 
   /**
    * 渲染 SVG 元素（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  async render(layer, time) {
+  async render(layer, time, paperInstance = null) {
     if (!this.visible) return null;
 
     // 检查时间范围
@@ -141,8 +144,13 @@ export class SVGElement extends BaseElement {
       return null;
     }
 
-    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 paper.view.viewSize
-    const viewSize = paper.view.viewSize;
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
+    // 优先使用元素的 canvasWidth/canvasHeight，如果没有则使用 project.view.viewSize
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { 
       width: this.canvasWidth || viewSize.width, 
       height: this.canvasHeight || viewSize.height 
@@ -168,29 +176,29 @@ export class SVGElement extends BaseElement {
     });
 
     try {
-      // 检查 paper.project 是否可用
-      if (!paper.project) {
-        console.warn('[SVGElement] paper.project 不可用');
+      // 检查 project 是否可用
+      if (!project) {
+        console.warn('[SVGElement] project 不可用');
         return null;
       }
       
       // 检查缓存的 svgItem 是否仍然有效（属于当前的 project）
       let svgItem = this.svgItem;
-      const isItemValid = svgItem && svgItem.project === paper.project && svgItem.parent;
+      const isItemValid = svgItem && svgItem.project === project && svgItem.parent;
       
       // 如果 svgItem 无效或不存在，需要重新导入
       if (!isItemValid) {
         // 如果 svgItem 存在但不属于当前 project，清除它
-        if (svgItem && svgItem.project !== paper.project) {
+        if (svgItem && svgItem.project !== project) {
           this.svgItem = null;
           svgItem = null;
         }
         
         // 尝试导入 SVG
-        if (typeof paper.project.importSVG === 'function') {
+        if (typeof project.importSVG === 'function') {
           try {
             // 方法1：直接导入 SVG 字符串
-            svgItem = paper.project.importSVG(this.svgContent, {
+            svgItem = project.importSVG(this.svgContent, {
               expandShapes: true,
             });
           } catch (importError) {
@@ -213,15 +221,8 @@ export class SVGElement extends BaseElement {
         this.svgItem = svgItem;
         
         // 如果是第一次渲染，调用 loaded 回调
-        if (this.onLoaded && !this._loadedCallbackCalled) {
-          try {
-            // loaded 回调：第一个参数是 svgElement，第二个参数是 time
-            this.onLoaded(this, time);
-            this._loadedCallbackCalled = true;
-          } catch (e) {
-            console.warn('[SVGElement] loaded 回调执行失败:', e);
-          }
-        }
+        // 使用 _callOnLoaded 方法以确保正确传递 paperInstance
+        this._callOnLoaded(time, svgItem, paperInstance);
         
         // 缓存 SVG 内部元素（如果已配置动画）
         if (this.elementAnimations.size > 0) {
@@ -275,11 +276,12 @@ export class SVGElement extends BaseElement {
       const itemX = rectX;
       const itemY = rectY;
 
-      svgItem.position = new paper.Point(itemX + scaledWidth / 2, itemY + scaledHeight / 2);
+      svgItem.position = new p.Point(itemX + scaledWidth / 2, itemY + scaledHeight / 2);
 
       // 应用变换（旋转、缩放等，位置已经设置了）
       this.applyTransform(svgItem, state, {
         applyPosition: false, // 位置已经设置了
+        paperInstance: paperInstance,
       });
 
       // 添加到 layer（如果还没有添加）
@@ -287,18 +289,11 @@ export class SVGElement extends BaseElement {
         layer.addChild(svgItem);
       }
 
-      // 应用内部元素的动画（每次渲染都要应用）
-      this._applyElementAnimations(time);
+      // 应用内部元素的动画（每次渲染都要应用，传递 paperInstance）
+      this._applyElementAnimations(time, paperInstance);
       
-      // 调用 render 回调
-      if (this.onRender) {
-        try {
-          // render 回调：第一个参数是 svgElement，第二个参数是 time
-          this.onRender(this, time);
-        } catch (e) {
-          console.warn('[SVGElement] render 回调执行失败:', e);
-        }
-      }
+      // 调用 render 回调（使用 _callOnRender 方法以确保正确传递 paperInstance）
+      this._callOnRender(time, svgItem, paperInstance);
 
       return svgItem;
     } catch (error) {
@@ -492,8 +487,12 @@ export class SVGElement extends BaseElement {
   /**
    * 应用内部元素的动画
    * @private
+   * @param {number} time - 当前时间
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _applyElementAnimations(time) {
+  _applyElementAnimations(time, paperInstance = null) {
+    // 获取 Paper.js 实例
+    const { paper: p } = this.getPaperInstance(paperInstance);
     if (!this.svgItem || this.elementAnimations.size === 0) {
       return;
     }
@@ -526,10 +525,10 @@ export class SVGElement extends BaseElement {
       
       // 保存元素的原始状态（第一次）
       if (!element._originalPosition) {
-        element._originalPosition = element.position ? element.position.clone() : new paper.Point(0, 0);
+        element._originalPosition = element.position ? element.position.clone() : new p.Point(0, 0);
       }
       if (!element._originalScaling) {
-        element._originalScaling = element.scaling ? element.scaling.clone() : new paper.Point(1, 1);
+        element._originalScaling = element.scaling ? element.scaling.clone() : new p.Point(1, 1);
       }
       if (element._originalOpacity === undefined) {
         element._originalOpacity = element.opacity !== undefined ? element.opacity : 1;
@@ -561,27 +560,34 @@ export class SVGElement extends BaseElement {
         continue;
       }
       
-      // 应用属性
-      this._applyPropertiesToElement(element, props, time);
+      // 应用属性（传递 paperInstance）
+      this._applyPropertiesToElement(element, props, time, paperInstance);
     }
   }
 
   /**
    * 将属性应用到元素
    * @private
+   * @param {paper.Item} element - Paper.js 元素
+   * @param {Object} props - 属性对象
+   * @param {number} time - 当前时间
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _applyPropertiesToElement(element, props, time) {
+  _applyPropertiesToElement(element, props, time, paperInstance = null) {
+    // 获取 Paper.js 实例
+    const { paper: p } = this.getPaperInstance(paperInstance);
+    
     // 位置
     if (typeof props.x === 'number' || typeof props.y === 'number') {
       // 使用原始位置作为基准
-      const originalPos = element._originalPosition || (element.position ? element.position.clone() : new paper.Point(0, 0));
+      const originalPos = element._originalPosition || (element.position ? element.position.clone() : new p.Point(0, 0));
       if (!element._originalPosition) {
         element._originalPosition = originalPos.clone();
       }
       
       const newX = typeof props.x === 'number' ? (originalPos.x + props.x) : originalPos.x;
       const newY = typeof props.y === 'number' ? (originalPos.y + props.y) : originalPos.y;
-      element.position = new paper.Point(newX, newY);
+      element.position = new p.Point(newX, newY);
     }
     
     // 旋转
@@ -591,15 +597,15 @@ export class SVGElement extends BaseElement {
     
     // 缩放
     if (typeof props.scaleX === 'number' || typeof props.scaleY === 'number') {
-      const originalScale = element._originalScaling || new paper.Point(1, 1);
+      const originalScale = element._originalScaling || new p.Point(1, 1);
       const newScaleX = typeof props.scaleX === 'number' ? props.scaleX : originalScale.x;
       const newScaleY = typeof props.scaleY === 'number' ? props.scaleY : originalScale.y;
       // 设置绝对缩放值
-      element.scaling = new paper.Point(newScaleX, newScaleY);
+      element.scaling = new p.Point(newScaleX, newScaleY);
     } else if (typeof props.scale === 'number') {
       // 统一缩放
-      const originalScale = element._originalScaling || new paper.Point(1, 1);
-      element.scaling = new paper.Point(originalScale.x * props.scale, originalScale.y * props.scale);
+      const originalScale = element._originalScaling || new p.Point(1, 1);
+      element.scaling = new p.Point(originalScale.x * props.scale, originalScale.y * props.scale);
     }
     
     // 不透明度

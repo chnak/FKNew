@@ -40,6 +40,7 @@ export class Renderer {
     this.quality = config.quality || 'high';
     this.canvas = null;
     this.project = null;
+    this.paper = null; // Paper.js 实例引用
     this.initialized = false;
   }
 
@@ -52,14 +53,25 @@ export class Renderer {
     // 创建离屏 Canvas（用于最终输出）
     this.canvas = paper.createCanvas(this.width, this.height);
     
-    // 初始化 Paper.js（使用全局 paper，因为所有元素类都使用全局 paper）
-    // 注意：在多层嵌套时，需要确保每个 Renderer 在渲染时使用正确的 project
-    paper.setup(this.canvas);
-
-    // 保存 project 引用
-    this.project = paper.project;
+    // 创建新的 Paper.js Project（实例化）
+    // 每个 Renderer 都有自己独立的 project
+    this.project = new paper.Project(this.canvas);
+    
+    // 保存 paper 引用（用于访问 Paper.js 的类，如 paper.Point, paper.Path 等）
+    this.paper = paper;
 
     this.initialized = true;
+  }
+  
+  /**
+   * 获取 Paper.js 实例（用于传递给元素）
+   * @returns {Object} Paper.js 实例对象，包含 project 和 paper 类
+   */
+  getPaperInstance() {
+    return {
+      project: this.project,
+      paper: this.paper, // 用于访问 Paper.js 的类（Point, Path, Color 等）
+    };
   }
 
   /**
@@ -73,7 +85,7 @@ export class Renderer {
       this.canvas.height = height;
     }
     if (this.project && this.project.view) {
-      this.project.view.viewSize = new paper.Size(width, height);
+      this.project.view.viewSize = new this.paper.Size(width, height);
     }
   }
 
@@ -81,9 +93,9 @@ export class Renderer {
    * 清空场景
    */
   clear() {
-    // 重新 setup 后，project 可能已经改变，需要重新获取
-    if (paper.project && paper.project.activeLayer) {
-      paper.project.activeLayer.removeChildren();
+    // 清空当前 project 的 activeLayer
+    if (this.project && this.project.activeLayer) {
+      this.project.activeLayer.removeChildren();
     }
   }
 
@@ -103,19 +115,6 @@ export class Renderer {
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // 确保使用当前 renderer 的 project（可能被转场渲染切换了）
-    // 如果 paper.project 不是当前 renderer 的 project，切换回来
-    if (paper.project !== this.project) {
-      // 如果 project 不存在，重新 setup
-      if (!this.project) {
-        paper.setup(this.canvas);
-        this.project = paper.project;
-      } else {
-        // 切换回当前 renderer 的 project
-        paper.project = this.project;
-      }
-    }
-
     // 清空 Paper.js 场景（复用 project 时只需要清空子元素）
     if (this.project && this.project.activeLayer) {
       this.project.activeLayer.removeChildren();
@@ -124,8 +123,8 @@ export class Renderer {
     // 绘制背景（使用 Paper.js）
     // 只有当背景不是透明时才绘制
     if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0,0,0,0)') {
-      const bgRect = new paper.Path.Rectangle({
-        rectangle: new paper.Rectangle(0, 0, this.width, this.height),
+      const bgRect = new this.paper.Path.Rectangle({
+        rectangle: new this.paper.Rectangle(0, 0, this.width, this.height),
         fillColor: backgroundColor,
       });
       bgRect.sendToBack();
@@ -137,12 +136,15 @@ export class Renderer {
     // 收集所有已渲染的元素
     const renderedElements = [];
     
+    // 获取 Paper.js 实例（传递给图层和元素）
+    const paperInstance = this.getPaperInstance();
+    
     // 渲染所有图层到 Paper.js
     for (const layer of sortedLayers) {
       if (layer.isActiveAtTime(time)) {
         // 使用 Paper.js 渲染（支持异步）
-        // 确保使用当前 project 的 activeLayer
-        const result = layer.render(this.project.activeLayer, time);
+        // 传递 paperInstance 给图层，图层再传递给元素
+        const result = layer.render(this.project.activeLayer, time, paperInstance);
         if (result && typeof result.then === 'function') {
           await result;
         }
@@ -165,8 +167,8 @@ export class Renderer {
     // 触发元素的 onFrame 回调
     for (const element of renderedElements) {
       if (element.onFrame) {
-        // 使用元素保存的 _paperItem 引用
-        element._callOnFrame(frameEvent, element._paperItem);
+        // 使用元素保存的 _paperItem 引用，并传递 paperInstance
+        element._callOnFrame(frameEvent, element._paperItem, paperInstance);
       }
     }
     
@@ -302,12 +304,9 @@ export class Renderer {
         if (this.project.activeLayer) {
           this.project.activeLayer.removeChildren();
         }
-        // 尝试移除项目（如果 Paper.js 支持）
-        if (paper.projects && paper.projects.length > 0) {
-          const index = paper.projects.indexOf(this.project);
-          if (index > -1) {
-            paper.projects.splice(index, 1);
-          }
+        // 移除项目
+        if (this.project && this.project.remove) {
+          this.project.remove();
         }
       } catch (error) {
         // 忽略清理错误

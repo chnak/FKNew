@@ -709,6 +709,7 @@ export class BaseElement {
    * @param {boolean} options.applyOpacity - 是否应用透明度，默认 true
    * @param {boolean} options.applyRotation - 是否应用旋转，默认 true
    * @param {boolean} options.applyScale - 是否应用缩放，默认 true
+   * @param {Object} options.paperInstance - Paper.js 实例 { project, paper }（可选）
    */
   applyTransform(item, state, options = {}) {
     if (!item) return;
@@ -719,7 +720,11 @@ export class BaseElement {
       applyOpacity = true,
       applyRotation = true,
       applyScale = true,
+      paperInstance = null,
     } = options;
+    
+    // 获取 Paper.js 实例
+    const { paper: p } = this.getPaperInstance(paperInstance);
 
     // 快速路径：检查是否有需要应用的变换
     const needsPosition = applyPosition && state.x !== undefined && typeof state.x === 'number' && state.y !== undefined && typeof state.y === 'number';
@@ -736,10 +741,10 @@ export class BaseElement {
     if (needsPosition) {
       // 如果 item 有 position 属性，直接设置
       if (item.position !== undefined) {
-        item.position = new paper.Point(state.x, state.y);
+        item.position = new p.Point(state.x, state.y);
       } else if (item.center !== undefined) {
         // 对于 Path 等对象，使用 center
-        item.center = new paper.Point(state.x, state.y);
+        item.center = new p.Point(state.x, state.y);
       }
     }
 
@@ -758,7 +763,7 @@ export class BaseElement {
       } else if (item.center) {
         transformPivot = item.center;
       } else {
-        transformPivot = new paper.Point(0, 0);
+        transformPivot = new p.Point(0, 0);
       }
 
       // 应用旋转
@@ -796,12 +801,39 @@ export class BaseElement {
   /**
    * 调用 onLoaded 回调（如果存在且未调用过）
    * @param {number} time - 当前时间（秒）
+   * @param {paper.Item} paperItem - Paper.js 项目（如果已创建）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _callOnLoaded(time) {
+  _callOnLoaded(time, paperItem = null, paperInstance = null) {
     if (this.onLoaded && !this._loadedCallbackCalled) {
       try {
-        this.onLoaded(this, time);
-        this._loadedCallbackCalled = true;
+        // 获取正确的 Paper.js 实例
+        const { paper: p, project } = this.getPaperInstance(paperInstance || this._paperInstance);
+        
+        // 临时设置全局 paper.project 为当前实例的 project
+        const originalProject = paper.project;
+        if (project && paper) {
+          paper.project = project;
+        }
+        
+        try {
+          // 调用 onLoaded 回调
+          // 如果回调接受 3 个参数，传递 paperItem 作为第三个参数
+          // 如果回调接受 4 个参数，传递 paperInstance 作为第四个参数
+          if (this.onLoaded.length >= 4) {
+            this.onLoaded(this, time, paperItem, { paper: p, project });
+          } else if (this.onLoaded.length >= 3) {
+            this.onLoaded(this, time, paperItem);
+          } else {
+            this.onLoaded(this, time);
+          }
+          this._loadedCallbackCalled = true;
+        } finally {
+          // 恢复原始的 project
+          if (originalProject !== undefined) {
+            paper.project = originalProject;
+          }
+        }
       } catch (e) {
         console.warn(`[${this.type}] onLoaded 回调执行失败:`, e);
       }
@@ -812,8 +844,9 @@ export class BaseElement {
    * 调用 onRender 回调（如果存在）
    * @param {number} time - 当前时间（秒）
    * @param {paper.Item} paperItem - Paper.js 项目（如果已创建）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _callOnRender(time, paperItem = null) {
+  _callOnRender(time, paperItem = null, paperInstance = null) {
     // 如果元素有 _paperItem 属性，更新它（用于 onFrame 中访问）
     if (paperItem && this._paperItem !== paperItem) {
       this._paperItem = paperItem;
@@ -821,7 +854,32 @@ export class BaseElement {
     
     if (this.onRender) {
       try {
-        this.onRender(this, time);
+        // 获取正确的 Paper.js 实例
+        const { paper: p, project } = this.getPaperInstance(paperInstance || this._paperInstance);
+        
+        // 临时设置全局 paper.project 为当前实例的 project
+        const originalProject = paper.project;
+        if (project && paper) {
+          paper.project = project;
+        }
+        
+        try {
+          // 调用 onRender 回调
+          // 如果回调接受 3 个参数，传递 paperItem 作为第三个参数
+          // 如果回调接受 4 个参数，传递 paperInstance 作为第四个参数
+          if (this.onRender.length >= 4) {
+            this.onRender(this, time, paperItem, { paper: p, project });
+          } else if (this.onRender.length >= 3) {
+            this.onRender(this, time, paperItem);
+          } else {
+            this.onRender(this, time);
+          }
+        } finally {
+          // 恢复原始的 project
+          if (originalProject !== undefined) {
+            paper.project = originalProject;
+          }
+        }
       } catch (e) {
         console.warn(`[${this.type}] onRender 回调执行失败:`, e);
       }
@@ -832,20 +890,69 @@ export class BaseElement {
    * 调用 onFrame 回调（如果存在）
    * @param {Object} event - Paper.js onFrame 事件对象 { count, time, delta }
    * @param {paper.Item} paperItem - Paper.js 项目（如果已创建）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  _callOnFrame(event, paperItem = null) {
+  _callOnFrame(event, paperItem = null, paperInstance = null) {
     // 更新 Paper.js 项目引用
     if (paperItem && this._paperItem !== paperItem) {
       this._paperItem = paperItem;
     }
     
+    // 保存 paperInstance 以便在 onFrame 回调中使用
+    if (paperInstance && !this._paperInstance) {
+      this._paperInstance = paperInstance;
+    }
+    
     if (this.onFrame) {
       try {
-        this.onFrame(this, event, this._paperItem || paperItem);
+        // 获取正确的 Paper.js 实例
+        const { paper: p, project } = this.getPaperInstance(paperInstance || this._paperInstance);
+        
+        // 临时设置全局 paper.project 为当前实例的 project
+        // 这样用户在 onFrame 回调中使用 paper. 时，可以访问到正确的 project
+        const originalProject = paper.project;
+        if (project && paper) {
+          paper.project = project;
+        }
+        
+        try {
+          // 调用 onFrame 回调
+          // 如果回调接受 4 个参数，传递 paperInstance 作为第四个参数
+          // 否则只传递 3 个参数（保持向后兼容）
+          if (this.onFrame.length >= 4) {
+            this.onFrame(this, event, this._paperItem || paperItem, { paper: p, project });
+          } else {
+            this.onFrame(this, event, this._paperItem || paperItem);
+          }
+        } finally {
+          // 恢复原始的 project
+          if (originalProject !== undefined) {
+            paper.project = originalProject;
+          }
+        }
       } catch (e) {
         console.warn(`[${this.type}] onFrame 回调执行失败:`, e);
       }
     }
+  }
+
+  /**
+   * 获取 Paper.js 实例（辅助方法，用于在 render 方法中获取 paper 和 project）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
+   * @returns {Object} { paper, project } - Paper.js 对象和项目
+   */
+  getPaperInstance(paperInstance = null) {
+    // 如果没有传入 paperInstance，尝试使用全局 paper（向后兼容）
+    if (!paperInstance) {
+      return {
+        paper: paper,
+        project: paper.project || null,
+      };
+    }
+    return {
+      paper: paperInstance.paper || paper,
+      project: paperInstance.project || (paper.project || null),
+    };
   }
 
   /**

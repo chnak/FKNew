@@ -216,8 +216,8 @@ export class VideoElement extends BaseElement {
 
       this.initialized = true;
       
-      // 调用 onLoaded 回调
-      this._callOnLoaded(this.startTime || 0);
+      // 调用 onLoaded 回调（注意：此时还没有 paperItem，所以传递 null）
+      this._callOnLoaded(this.startTime || 0, null, null);
     } catch (error) {
       console.error(`Failed to initialize video: ${this.videoPath}`, error);
       this.initialized = false;
@@ -289,9 +289,12 @@ export class VideoElement extends BaseElement {
    * @param {Object} state - 元素状态
    * @param {number} width - 元素宽度
    * @param {number} height - 元素高度
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    * @returns {paper.Group|paper.Raster} 应用效果后的对象
    */
-  applyVisualEffects(raster, state, width, height) {
+  applyVisualEffects(raster, state, width, height, paperInstance = null) {
+    // 获取 Paper.js 实例
+    const { paper: p } = this.getPaperInstance(paperInstance);
     // 检查是否有视觉效果
     const hasBorder = state.borderWidth > 0;
     const hasShadow = state.shadowBlur > 0;
@@ -304,7 +307,7 @@ export class VideoElement extends BaseElement {
     }
 
     // 创建组来包含所有效果
-    const group = new paper.Group();
+    const group = new p.Group();
     
     // 应用翻转
     if (hasFlip) {
@@ -324,7 +327,7 @@ export class VideoElement extends BaseElement {
     // 应用阴影（通过创建阴影层）
     if (hasShadow) {
       const shadowRaster = raster.clone();
-      shadowRaster.position = new paper.Point(
+      shadowRaster.position = new p.Point(
         raster.position.x + (state.shadowOffsetX || 0),
         raster.position.y + (state.shadowOffsetY || 0)
       );
@@ -332,14 +335,14 @@ export class VideoElement extends BaseElement {
       
       // 应用阴影颜色（通过 tint）
       if (state.shadowColor) {
-        const shadowColor = new paper.Color(state.shadowColor);
+        const shadowColor = new p.Color(state.shadowColor);
         shadowRaster.tint = shadowColor;
       }
       
       // 应用模糊（通过降低分辨率模拟）
       if (state.shadowBlur > 0) {
         const blurFactor = Math.max(1, state.shadowBlur / 10);
-        shadowRaster.size = new paper.Size(
+        shadowRaster.size = new p.Size(
           shadowRaster.size.width * (1 + blurFactor * 0.1),
           shadowRaster.size.height * (1 + blurFactor * 0.1)
         );
@@ -353,8 +356,8 @@ export class VideoElement extends BaseElement {
 
     // 应用边框（通过绘制边框路径）
     if (hasBorder) {
-      const borderPath = new paper.Path.Rectangle({
-        rectangle: new paper.Rectangle(
+      const borderPath = new p.Path.Rectangle({
+        rectangle: new p.Rectangle(
           raster.position.x - width / 2,
           raster.position.y - height / 2,
           width,
@@ -362,7 +365,7 @@ export class VideoElement extends BaseElement {
         ),
         radius: state.borderRadius || 0,
       });
-      borderPath.strokeColor = new paper.Color(state.borderColor || '#000000');
+      borderPath.strokeColor = new p.Color(state.borderColor || '#000000');
       borderPath.strokeWidth = state.borderWidth;
       borderPath.fillColor = null;
       group.addChild(borderPath);
@@ -370,8 +373,8 @@ export class VideoElement extends BaseElement {
 
     // 毛玻璃效果：添加边框（如果启用）
     if (hasGlassEffect && state.glassBorder) {
-      const glassBorderPath = new paper.Path.Rectangle({
-        rectangle: new paper.Rectangle(
+      const glassBorderPath = new p.Path.Rectangle({
+        rectangle: new p.Rectangle(
           raster.position.x - width / 2,
           raster.position.y - height / 2,
           width,
@@ -379,7 +382,7 @@ export class VideoElement extends BaseElement {
         ),
         radius: state.borderRadius || 0,
       });
-      glassBorderPath.strokeColor = new paper.Color(state.glassBorderColor || '#ffffff');
+      glassBorderPath.strokeColor = new p.Color(state.glassBorderColor || '#ffffff');
       glassBorderPath.strokeWidth = state.glassBorderWidth || 1;
       glassBorderPath.fillColor = null;
       glassBorderPath.opacity = 0.5; // 半透明边框
@@ -391,8 +394,11 @@ export class VideoElement extends BaseElement {
 
   /**
    * 渲染视频元素（使用 Paper.js）
+   * @param {paper.Layer} layer - Paper.js 图层
+   * @param {number} time - 当前时间（秒）
+   * @param {Object} paperInstance - Paper.js 实例 { project, paper }
    */
-  async render(layer, time) {
+  async render(layer, time, paperInstance = null) {
     if (!this.visible) {
       return null;
     }
@@ -419,8 +425,13 @@ export class VideoElement extends BaseElement {
       return null;
     }
 
+    // 获取 Paper.js 实例
+    const { paper: p, project } = this.getPaperInstance(paperInstance);
+
     // 获取场景尺寸用于单位转换
-    const viewSize = paper.view && paper.view.viewSize ? paper.view.viewSize : { width: 1920, height: 1080 };
+    const viewSize = project && project.view && project.view.viewSize 
+      ? project.view.viewSize 
+      : { width: 1920, height: 1080 };
     const context = { 
       width: this.canvasWidth || viewSize.width, 
       height: this.canvasHeight || viewSize.height 
@@ -521,23 +532,24 @@ export class VideoElement extends BaseElement {
     }
 
     // 使用 Paper.js 的 Raster 渲染视频帧
-    const raster = new paper.Raster(imageData);
-    raster.position = new paper.Point(x, y);
-    raster.size = new paper.Size(width, height);
+    const raster = new p.Raster(imageData);
+    raster.position = new p.Point(x, y);
+    raster.size = new p.Size(width, height);
 
     // 使用统一的变换方法应用动画
     this.applyTransform(raster, state, {
       applyPosition: false, // 位置已经通过 raster.position 设置了
+      paperInstance: paperInstance,
     });
 
     // 应用视觉效果（边框、阴影、翻转、混合模式）
-    const finalItem = this.applyVisualEffects(raster, state, width, height);
+    const finalItem = this.applyVisualEffects(raster, state, width, height, paperInstance);
 
     // 添加到 layer
     layer.addChild(finalItem);
     
-    // 调用 onRender 回调
-    this._callOnRender(time);
+    // 调用 onRender 回调（传递 paperItem 和 paperInstance）
+    this._callOnRender(time, finalItem, paperInstance);
     
     return finalItem;
   }
