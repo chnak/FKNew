@@ -37,10 +37,6 @@ export class VideoElement extends BaseElement {
     this.videoInfo = null;
     this.initialized = false;
     
-    // 性能优化：复用 Canvas 和 Image 对象
-    this._frameCanvas = null;
-    this._frameImage = null;
-    
     // 音频相关
     this.audioStream = null;
     this.audioPath = null; // 提取的音频文件路径
@@ -133,23 +129,14 @@ export class VideoElement extends BaseElement {
       });
 
       // 启动 FFmpeg 进程
-      // 在 worker 环境中，不能使用 process.stderr，需要使用 'pipe' 或 'ignore'
       const ps = execa('ffmpeg', args, {
         encoding: 'buffer',
         buffer: false,
         stdin: 'ignore',
         stdout: 'pipe', // 使用 pipe，然后手动连接
-        stderr: 'pipe', // 在 worker 环境中使用 pipe 而不是 process.stderr
+        stderr: process.stderr,
         cancelSignal: controller.signal
       });
-      
-      // 如果有 stderr 输出，可以记录日志（可选）
-      if (ps.stderr) {
-        ps.stderr.on('data', (data) => {
-          // 可以选择性地记录错误信息
-          // console.error('[FFmpeg stderr]', data.toString());
-        });
-      }
 
       // 处理流的错误
       transform.on('error', (err) => {
@@ -190,12 +177,8 @@ export class VideoElement extends BaseElement {
       this.finalWidth = finalWidth;
       this.finalHeight = finalHeight;
 
-      // 性能优化：在并行渲染时，为了支持随机访问，需要缓冲所有帧
-      // 如果启用循环，或者视频时长较短（小于60秒），先缓冲所有帧
-      const shouldBuffer = this.loop || (this.videoInfo.duration > 0 && this.videoInfo.duration < 60);
-      
-      if (shouldBuffer) {
-        console.log(`[VideoElement] 缓冲视频帧（${this.videoInfo.duration.toFixed(2)}秒）...`);
+      // 如果启用循环，先缓冲所有帧
+      if (this.loop) {
         while (true) {
           const { value, done } = await this.frameIterator.next();
           if (done) break;
@@ -203,7 +186,6 @@ export class VideoElement extends BaseElement {
             this.frameBuffer.push(Buffer.from(value));
           }
         }
-        console.log(`[VideoElement] 视频帧缓冲完成，共 ${this.frameBuffer.length} 帧`);
       }
 
       // 如果不禁音，提取视频中的音频
@@ -259,33 +241,22 @@ export class VideoElement extends BaseElement {
     try {
       let rgba;
 
-      // 如果已缓冲帧，从缓冲区中根据 progress 获取
-      if (this.frameBuffer.length > 0) {
-        // 根据 progress 计算帧索引
-        let frameIndex = Math.floor(progress * this.frameBuffer.length);
-        
-        // 确保索引在有效范围内
-        frameIndex = Math.max(0, Math.min(frameIndex, this.frameBuffer.length - 1));
-        
-        // 如果是循环模式，使用模运算
-        if (this.loop) {
-          frameIndex = frameIndex % this.frameBuffer.length;
-        }
-        
+      if (this.loop && this.frameBuffer.length > 0) {
+        // 循环模式：从缓冲的帧中获取
+        const frameIndex = Math.floor(progress * this.frameBuffer.length) % this.frameBuffer.length;
         rgba = this.frameBuffer[frameIndex];
       } else {
-        // 未缓冲模式：从迭代器顺序获取（不推荐用于并行渲染）
-        // 注意：这种方式在并行渲染时会导致帧顺序错乱
+        // 正常模式：从迭代器获取
         try {
           const { value, done } = await this.frameIterator.next();
           if (done) {
-            // 如果迭代器结束，返回 null
+            // 如果迭代器结束，尝试重新初始化（可能是视频较短）
             return null;
           }
           rgba = value ? Buffer.from(value) : null;
         } catch (err) {
           // 迭代器错误，可能是流已关闭
-          console.warn('[VideoElement] Frame iterator error:', err.message);
+          console.warn('Frame iterator error:', err.message);
           return null;
         }
       }
@@ -294,20 +265,18 @@ export class VideoElement extends BaseElement {
         return null;
       }
 
-      // 性能优化：复用 Canvas，避免每次创建
-      if (!this._frameCanvas) {
-        this._frameCanvas = createCanvas(this.finalWidth, this.finalHeight);
-      }
-      
-      const canvas = this._frameCanvas;
+      // 将 RGBA Buffer 转换为 canvas Image
+      const canvas = createCanvas(this.finalWidth, this.finalHeight);
       const ctx = canvas.getContext('2d');
       const imageData = ctx.createImageData(this.finalWidth, this.finalHeight);
       imageData.data.set(rgba);
       ctx.putImageData(imageData, 0, 0);
 
-      // 性能优化：直接返回 Canvas，Paper.js 的 Raster 可以直接使用 Canvas
-      // 这样可以避免 toDataURL() 的 Base64 编码开销（这是最大的性能瓶颈）
-      return canvas;
+      // 创建 Image 对象
+      const image = new Image();
+      image.src = canvas.toDataURL();
+
+      return image;
     } catch (error) {
       console.error('Failed to get video frame:', error);
       return null;
@@ -503,14 +472,8 @@ export class VideoElement extends BaseElement {
         const tempCanvas = createCanvas(imgWidth, imgHeight);
         const tempCtx = tempCanvas.getContext('2d');
         
-        // 绘制原始帧（frameImage 可能是 Canvas 或 Image）
-        if (frameImage instanceof HTMLCanvasElement || (frameImage && frameImage.getContext)) {
-          // 如果是 Canvas，直接绘制
-          tempCtx.drawImage(frameImage, 0, 0, imgWidth, imgHeight);
-        } else {
-          // 如果是 Image，也直接绘制
-          tempCtx.drawImage(frameImage, 0, 0, imgWidth, imgHeight);
-        }
+        // 绘制原始帧
+        tempCtx.drawImage(frameImage, 0, 0, imgWidth, imgHeight);
         
         // 构建滤镜字符串
         let filterString = state.filter || '';
@@ -665,4 +628,3 @@ export class VideoElement extends BaseElement {
     this.initialized = false;
   }
 }
-
