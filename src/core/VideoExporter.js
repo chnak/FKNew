@@ -27,6 +27,36 @@ export class VideoExporter {
   }
 
   /**
+   * 预先初始化所有 VideoElement（避免在 Worker 中重复初始化）
+   * @param {VideoMaker} composition - 合成对象
+   */
+  async preInitializeVideoElements(composition) {
+    const videoElements = new Set();
+    
+    // 收集所有 VideoElement
+    const collectVideoElements = (layers) => {
+      for (const layer of layers) {
+        if (layer.elements) {
+          for (const element of layer.elements) {
+            if (element && element.type === 'video' && element.videoPath && !element.initialized) {
+              videoElements.add(element);
+            }
+          }
+        }
+      }
+    };
+    
+    collectVideoElements(composition.layers || []);
+    
+    // 并行初始化所有 VideoElement
+    if (videoElements.size > 0) {
+      console.log(`预先初始化 ${videoElements.size} 个视频元素...`);
+      await Promise.all(Array.from(videoElements).map(element => element.initialize()));
+      console.log(`所有视频元素初始化完成`);
+    }
+  }
+
+  /**
    * 导出视频
    * @param {VideoMaker} composition - 合成对象
    * @param {string} outputPath - 输出路径
@@ -47,6 +77,9 @@ export class VideoExporter {
     // 确保输出目录存在
     const outputDir = path.dirname(outputPath);
     await fs.ensureDir(outputDir);
+    
+    // 预先初始化所有 VideoElement（避免在 Worker 中重复初始化）
+    await this.preInitializeVideoElements(composition);
 
 
 

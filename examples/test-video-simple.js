@@ -75,8 +75,8 @@ async function testVideoSimple() {
     const videoMaker = builder.build();
     await videoMaker.export(outputPath, {
       usePipe: true,
-      parallel: true,
-      maxWorkers: 2,
+      // parallel: true,
+      // maxWorkers: 2,
     });
     const endTime = Date.now();
     

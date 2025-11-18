@@ -11,6 +11,23 @@ import path from 'path';
 import os from 'os';
 
 /**
+ * 全局视频帧缓存（避免多个实例重复初始化同一视频）
+ * 使用 global 对象存储，确保跨模块实例共享（但在 Worker 线程中不共享）
+ * Map<cacheKey, { frameBuffer, videoInfo, initializingPromise }>
+ */
+if (!global.__videoFrameCache) {
+  global.__videoFrameCache = new Map();
+}
+const globalVideoFrameCache = global.__videoFrameCache;
+
+/**
+ * 生成视频缓存键
+ */
+function getVideoCacheKey(videoPath, cutFrom, cutTo, finalWidth, finalHeight, fps) {
+  return `${videoPath}|${cutFrom}|${cutTo}|${finalWidth}|${finalHeight}|${fps}`;
+}
+
+/**
  * 检测是否在 CommonJS 环境中
  */
 function isCommonJS() {
@@ -162,7 +179,7 @@ export class VideoElement extends BaseElement {
     // 创建初始化 Promise
     this._initializingPromise = (async () => {
       try {
-      // 获取视频流信息
+        // 获取视频流信息
       const streams = await readFileStreams(this.videoPath);
       const videoStream = streams.find(s => s.codec_type === 'video');
       
@@ -258,235 +275,304 @@ export class VideoElement extends BaseElement {
       const expectedFrames = Math.ceil(extractDuration * targetFps);
       this.expectedFrames = expectedFrames;
       
-      // 构建 FFmpeg 参数
-      const args = buildVideoFFmpegArgs({
-        inputPath: this.videoPath,
-        inputCodec,
-        cutFrom: actualCutFrom,
-        cutTo: actualCutTo,
-        speedFactor: this.speedFactor,
-        framerate: targetFps,
-        scaleFilter,
-        mute: this.mute,
-        volume: 1
-      });
-
-      // 创建转换流
-      const controller = new AbortController();
-      const transform = rawVideoToFrames({
-        width: finalWidth,
-        height: finalHeight,
-        channels: 4, // RGBA
-        signal: controller.signal
-      });
-
-      // 检测是否在 Worker 线程中
-      // Worker 线程中的 process.stderr 是 WritableWorkerStdio，不能直接传递给 execa
-      // 使用多种方法检测 Worker 线程
-      let isWorkerThread = false;
-      try {
-        // 方法1: 检查 WorkerGlobalScope
-        if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && self instanceof WorkerGlobalScope) {
-          isWorkerThread = true;
+      // 生成缓存键（使用 finalWidth 和 finalHeight）
+      const cacheKey = getVideoCacheKey(this.videoPath, actualCutFrom, actualCutTo, finalWidth, finalHeight, targetFps);
+      
+      // 检查全局缓存（在开始初始化之前）
+      const cached = globalVideoFrameCache.get(cacheKey);
+      if (cached && cached.initialized && cached.frameBuffer && cached.frameBuffer.length > 0) {
+        // 使用缓存的帧缓冲和视频信息
+        const isWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+        const threadInfo = isWorker ? '[Worker]' : '[Main]';
+        console.log(`${threadInfo} [VideoElement] 使用缓存的视频帧: ${this.videoPath} (${cached.frameBuffer.length} 帧)`);
+        this.frameBuffer = cached.frameBuffer;
+        this.videoInfo = cached.videoInfo;
+        this.finalWidth = cached.finalWidth;
+        this.finalHeight = cached.finalHeight;
+        this.initialized = true;
+        return;
+      }
+      
+      // 如果有正在进行的初始化，等待它完成
+      if (cached && cached.initializingPromise) {
+        const isWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+        const threadInfo = isWorker ? '[Worker]' : '[Main]';
+        console.log(`${threadInfo} [VideoElement] 等待其他实例完成初始化: ${this.videoPath}`);
+        await cached.initializingPromise;
+        const updatedCache = globalVideoFrameCache.get(cacheKey);
+        if (updatedCache && updatedCache.initialized && updatedCache.frameBuffer && updatedCache.frameBuffer.length > 0) {
+          this.frameBuffer = updatedCache.frameBuffer;
+          this.videoInfo = updatedCache.videoInfo;
+          this.finalWidth = updatedCache.finalWidth;
+          this.finalHeight = updatedCache.finalHeight;
+          this.initialized = true;
+          return;
         }
-        // 方法2: 检查 process.stderr 的类型
-        else if (process.stderr && typeof process.stderr === 'object') {
-          // Worker 线程中的 process.stderr 是 WritableWorkerStdio
-          const stderrType = process.stderr.constructor?.name || '';
-          if (stderrType === 'WritableWorkerStdio' || (process.stderr._writableState && !process.stderr.isTTY)) {
+      }
+      
+      // 创建初始化 Promise 并保存到缓存
+      const initializingPromise = (async () => {
+        try {
+          // 构建 FFmpeg 参数
+          const args = buildVideoFFmpegArgs({
+          inputPath: this.videoPath,
+          inputCodec,
+          cutFrom: actualCutFrom,
+          cutTo: actualCutTo,
+          speedFactor: this.speedFactor,
+          framerate: targetFps,
+          scaleFilter,
+          mute: this.mute,
+          volume: 1
+        });
+
+        // 创建转换流
+        const controller = new AbortController();
+        const transform = rawVideoToFrames({
+          width: finalWidth,
+          height: finalHeight,
+          channels: 4, // RGBA
+          signal: controller.signal
+        });
+
+        // 检测是否在 Worker 线程中
+        // Worker 线程中的 process.stderr 是 WritableWorkerStdio，不能直接传递给 execa
+        // 使用多种方法检测 Worker 线程
+        let isWorkerThread = false;
+        try {
+          // 方法1: 检查 WorkerGlobalScope
+          if (typeof WorkerGlobalScope !== 'undefined' && typeof self !== 'undefined' && self instanceof WorkerGlobalScope) {
             isWorkerThread = true;
           }
+          // 方法2: 检查 process.stderr 的类型
+          else if (process.stderr && typeof process.stderr === 'object') {
+            // Worker 线程中的 process.stderr 是 WritableWorkerStdio
+            const stderrType = process.stderr.constructor?.name || '';
+            if (stderrType === 'WritableWorkerStdio' || (process.stderr._writableState && !process.stderr.isTTY)) {
+              isWorkerThread = true;
+            }
+          }
+        } catch (e) {
+          // 如果检测失败，默认不在 Worker 线程中
+          isWorkerThread = false;
         }
-      } catch (e) {
-        // 如果检测失败，默认不在 Worker 线程中
-        isWorkerThread = false;
-      }
-      
-      const stderrOption = isWorkerThread ? 'pipe' : (process.stderr || 'pipe');
-      
-      // 启动 FFmpeg 进程
-      const ps = execa('ffmpeg', args, {
-        encoding: 'buffer',
-        buffer: false,
-        stdin: 'ignore',
-        stdout: 'pipe', // 使用 pipe，然后手动连接
-        stderr: stderrOption, // Worker 线程中使用 'pipe'，主线程使用 process.stderr
-        cancelSignal: controller.signal
-      });
-
-      // 处理流的错误
-      // 注意：在缓冲帧的过程中，transform 流可能会因为 FFmpeg 进程结束而触发错误
-      // 这是正常的，只要已经缓冲了帧就可以继续
-      let transformError = null;
-      transform.on('error', (err) => {
-        // 记录错误，但不立即中止（因为可能已经缓冲了足够的帧）
-        transformError = err;
-        console.warn('[VideoElement] Transform stream error (可能不影响缓冲):', err.message);
-        // 只有在进程未结束时才中止
-        if (!ps.killed && ps.exitCode === null) {
-          controller.abort();
-        }
-      });
-
-      // 在 Worker 线程中，stderr 使用 pipe，需要手动处理
-      if (isWorkerThread && ps.stderr) {
-        ps.stderr.on('data', (data) => {
-          // Worker 线程中可以选择忽略 stderr 或记录到日志
-          // 这里选择忽略，避免输出过多信息
-        });
-        ps.stderr.on('error', (err) => {
-          // 忽略 stderr 错误
-        });
-      }
-
-      // 等待 stdout 可用（CommonJS 环境中可能需要等待）
-      if (!ps.stdout) {
-        let waited = 0;
-        const maxWait = 200; // 增加到 200ms，给更多时间
-        while (!ps.stdout && waited < maxWait) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-          waited += 10;
-          // 重新检查 ps.stdout（可能在等待过程中变为可用）
-          if (ps.stdout) break;
-        }
-      }
-
-      // 检查 stdout 是否可用
-      if (!ps.stdout) {
-        // 如果 stdout 不可用，尝试等待进程启动
-        // 在某些情况下，execa 可能需要更多时间
-        console.warn('[VideoElement] FFmpeg stdout 初始不可用，等待进程启动...');
-        await new Promise(resolve => setTimeout(resolve, 50));
         
-        // 再次检查
+        const stderrOption = isWorkerThread ? 'pipe' : (process.stderr || 'pipe');
+        
+        // 启动 FFmpeg 进程
+        const ps = execa('ffmpeg', args, {
+          encoding: 'buffer',
+          buffer: false,
+          stdin: 'ignore',
+          stdout: 'pipe', // 使用 pipe，然后手动连接
+          stderr: stderrOption, // Worker 线程中使用 'pipe'，主线程使用 process.stderr
+          cancelSignal: controller.signal
+        });
+
+        // 处理流的错误
+        // 注意：在缓冲帧的过程中，transform 流可能会因为 FFmpeg 进程结束而触发错误
+        // 这是正常的，只要已经缓冲了帧就可以继续
+        let transformError = null;
+        transform.on('error', (err) => {
+          // 记录错误，但不立即中止（因为可能已经缓冲了足够的帧）
+          transformError = err;
+          console.warn('[VideoElement] Transform stream error (可能不影响缓冲):', err.message);
+          // 只有在进程未结束时才中止
+          if (!ps.killed && ps.exitCode === null) {
+            controller.abort();
+          }
+        });
+
+        // 在 Worker 线程中，stderr 使用 pipe，需要手动处理
+        if (isWorkerThread && ps.stderr) {
+          ps.stderr.on('data', (data) => {
+            // Worker 线程中可以选择忽略 stderr 或记录到日志
+            // 这里选择忽略，避免输出过多信息
+          });
+          ps.stderr.on('error', (err) => {
+            // 忽略 stderr 错误
+          });
+        }
+
+        // 等待 stdout 可用（CommonJS 环境中可能需要等待）
         if (!ps.stdout) {
-          console.error('[VideoElement] FFmpeg stdout is not available after waiting');
-          throw new Error('FFmpeg stdout is not available');
+          let waited = 0;
+          const maxWait = 200; // 增加到 200ms，给更多时间
+          while (!ps.stdout && waited < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+            waited += 10;
+            // 重新检查 ps.stdout（可能在等待过程中变为可用）
+            if (ps.stdout) break;
+          }
         }
-      }
 
-      // 保存 stdout 引用，避免后续访问时它可能被关闭
-      const stdout = ps.stdout;
-      
-      stdout.on('error', (err) => {
-        // stdout 错误通常表示 FFmpeg 进程已经结束或出现问题
-        // 但如果已经缓冲了帧，这可能不是致命错误
-        console.warn('[VideoElement] FFmpeg stdout error (可能不影响缓冲):', err.message);
-        // 不立即 destroy transform，让缓冲过程自然结束
-        // transform.destroy(err); // 注释掉，避免触发 transform 错误事件
-      });
-
-      // 将 FFmpeg 的 stdout 管道连接到 transform
-      // 设置 highWaterMark 以避免缓冲区溢出
-      stdout.pipe(transform, { end: false });
-
-      // 处理进程错误
-      ps.catch((err) => {
-        // FFmpeg 进程错误
-        // 如果进程被取消（exitCode 143）或正常结束，这是正常的
-        if (!err.isCanceled && err.exitCode !== 143) {
-          console.warn('[VideoElement] FFmpeg process error (可能不影响缓冲):', err.message);
+        // 检查 stdout 是否可用
+        if (!ps.stdout) {
+          // 如果 stdout 不可用，尝试等待进程启动
+          // 在某些情况下，execa 可能需要更多时间
+          console.warn('[VideoElement] FFmpeg stdout 初始不可用，等待进程启动...');
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // 再次检查
+          if (!ps.stdout) {
+            console.error('[VideoElement] FFmpeg stdout is not available after waiting');
+            throw new Error('FFmpeg stdout is not available');
+          }
         }
-        // 不立即 destroy，让缓冲过程自然结束
-        // transform.destroy(); // 注释掉，避免在缓冲过程中中断
-      });
 
-      // 当进程正常结束时，结束 transform 流
-      ps.then(() => {
-        // 进程正常结束，结束 transform 流
-        transform.end();
-      }).catch(() => {
-        // 进程异常结束，但不立即 destroy（可能正在缓冲）
-      });
+        // 保存 stdout 引用，避免后续访问时它可能被关闭
+        const stdout = ps.stdout;
+        
+        stdout.on('error', (err) => {
+          // stdout 错误通常表示 FFmpeg 进程已经结束或出现问题
+          // 但如果已经缓冲了帧，这可能不是致命错误
+          console.warn('[VideoElement] FFmpeg stdout error (可能不影响缓冲):', err.message);
+          // 不立即 destroy transform，让缓冲过程自然结束
+          // transform.destroy(err); // 注释掉，避免触发 transform 错误事件
+        });
 
-      // 转换为迭代器 - 使用 transform 流的迭代器
-      this.frameIterator = transform[Symbol.asyncIterator]();
-      this.controller = controller;
-      this.ps = ps;
-      this.finalWidth = finalWidth;
-      this.finalHeight = finalHeight;
+        // 将 FFmpeg 的 stdout 管道连接到 transform
+        // 设置 highWaterMark 以避免缓冲区溢出
+        stdout.pipe(transform, { end: false });
 
-      // 缓冲所有帧（用于随机访问）
-      let frameCount = 0;
-      let bufferError = null;
-      const frameSize = finalWidth * finalHeight * 4; // RGBA
-      
-      try {
-        while (true) {
-          try {
-            const { value, done } = await this.frameIterator.next();
-            if (done) {
+        // 处理进程错误
+        ps.catch((err) => {
+          // FFmpeg 进程错误
+          // 如果进程被取消（exitCode 143）或正常结束，这是正常的
+          if (!err.isCanceled && err.exitCode !== 143) {
+            console.warn('[VideoElement] FFmpeg process error (可能不影响缓冲):', err.message);
+          }
+          // 不立即 destroy，让缓冲过程自然结束
+          // transform.destroy(); // 注释掉，避免在缓冲过程中中断
+        });
+
+        // 当进程正常结束时，结束 transform 流
+        ps.then(() => {
+          // 进程正常结束，结束 transform 流
+          transform.end();
+        }).catch(() => {
+          // 进程异常结束，但不立即 destroy（可能正在缓冲）
+        });
+
+        // 转换为迭代器 - 使用 transform 流的迭代器
+        this.frameIterator = transform[Symbol.asyncIterator]();
+        this.controller = controller;
+        this.ps = ps;
+        this.finalWidth = finalWidth;
+        this.finalHeight = finalHeight;
+
+        // 缓冲所有帧（用于随机访问）
+        let frameCount = 0;
+        let bufferError = null;
+        const frameSize = finalWidth * finalHeight * 4; // RGBA
+        
+        try {
+          while (true) {
+            try {
+              const { value, done } = await this.frameIterator.next();
+              if (done) {
+                break;
+              }
+              if (value) {
+                this.frameBuffer.push(Buffer.from(value));
+                frameCount++;
+              }
+            } catch (iterError) {
+              if (frameCount === 0) {
+                bufferError = iterError;
+              }
               break;
             }
-            if (value) {
-              this.frameBuffer.push(Buffer.from(value));
-              frameCount++;
-            }
-          } catch (iterError) {
-            if (frameCount === 0) {
-              bufferError = iterError;
-            }
-            break;
-          }
-        }
-      } catch (error) {
-        if (frameCount === 0) {
-          bufferError = error;
-        }
-      }
-      
-      // 只有在没有缓冲到任何帧时才抛出错误
-      if (frameCount === 0) {
-        const errorMsg = bufferError 
-          ? `无法缓冲视频帧: ${bufferError.message}` 
-          : (transformError 
-            ? `无法缓冲视频帧: Transform stream error - ${transformError.message}` 
-            : '无法缓冲视频帧: 未知错误');
-        throw new Error(errorMsg);
-      }
-      
-      // 重新创建迭代器（如果需要的话，但通常不需要了）
-      // 注意：由于我们已经缓冲了所有帧，frameIterator 已经用完了
-      // 后续访问都从 frameBuffer 中获取
-
-      // 如果不禁音，提取视频中的音频
-      if (!this.mute) {
-        try {
-          const outputDir = path.join(os.tmpdir(), 'fknew-video-audio');
-          await import('fs-extra').then(fs => fs.ensureDir(outputDir));
-          
-          this.audioStream = await createAudioStream({
-            source: this.videoPath,
-            cutFrom: this.actualCutFrom,
-            cutTo: this.actualCutTo,
-            speedFactor: this.speedFactor,
-            volume: this.volume,
-            outputDir: outputDir
-          });
-          
-          if (this.audioStream && this.audioStream.path) {
-            this.audioPath = this.audioStream.path;
-            console.log(`[VideoElement] 视频音频已提取: ${this.audioPath}`);
-          } else {
-            console.log(`[VideoElement] 视频 ${this.videoPath} 没有音频轨道或音频提取失败`);
           }
         } catch (error) {
-          console.warn(`[VideoElement] 提取视频音频失败: ${error.message}`);
+          if (frameCount === 0) {
+            bufferError = error;
+          }
         }
-      }
+        
+        // 只有在没有缓冲到任何帧时才抛出错误
+        if (frameCount === 0) {
+          const errorMsg = bufferError 
+            ? `无法缓冲视频帧: ${bufferError.message}` 
+            : (transformError 
+              ? `无法缓冲视频帧: Transform stream error - ${transformError.message}` 
+              : '无法缓冲视频帧: 未知错误');
+          throw new Error(errorMsg);
+        }
+        
+        // 重新创建迭代器（如果需要的话，但通常不需要了）
+        // 注意：由于我们已经缓冲了所有帧，frameIterator 已经用完了
+        // 后续访问都从 frameBuffer 中获取
+
+        // 如果不禁音，提取视频中的音频
+        if (!this.mute) {
+          try {
+            const outputDir = path.join(os.tmpdir(), 'fknew-video-audio');
+            await import('fs-extra').then(fs => fs.ensureDir(outputDir));
+            
+            this.audioStream = await createAudioStream({
+              source: this.videoPath,
+              cutFrom: this.actualCutFrom,
+              cutTo: this.actualCutTo,
+              speedFactor: this.speedFactor,
+              volume: this.volume,
+              outputDir: outputDir
+            });
+            
+            if (this.audioStream && this.audioStream.path) {
+              this.audioPath = this.audioStream.path;
+              console.log(`[VideoElement] 视频音频已提取: ${this.audioPath}`);
+            } else {
+              console.log(`[VideoElement] 视频 ${this.videoPath} 没有音频轨道或音频提取失败`);
+            }
+          } catch (error) {
+            console.warn(`[VideoElement] 提取视频音频失败: ${error.message}`);
+          }
+        }
 
         this.initialized = true;
+        
+        // 保存到全局缓存
+        globalVideoFrameCache.set(cacheKey, {
+          frameBuffer: this.frameBuffer,
+          videoInfo: this.videoInfo,
+          finalWidth: this.finalWidth,
+          finalHeight: this.finalHeight,
+          initialized: true,
+          initializingPromise: null
+        });
         
         const isWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
         const threadInfo = isWorker ? '[Worker]' : '[Main]';
         console.log(`${threadInfo} [VideoElement] 初始化完成: ${this.videoPath}, 缓冲了 ${this.frameBuffer.length} 帧`);
         
-        // 调用 onLoaded 回调（注意：此时还没有 paperItem，所以传递 null）
-        this._callOnLoaded(this.startTime || 0, null, null);
+          // 调用 onLoaded 回调（注意：此时还没有 paperItem，所以传递 null）
+          this._callOnLoaded(this.startTime || 0, null, null);
+        } catch (error) {
+          const isWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+          const threadInfo = isWorker ? '[Worker]' : '[Main]';
+          console.error(`${threadInfo} [VideoElement] 初始化失败: ${this.videoPath}`, error);
+          this.initialized = false;
+          // 清除缓存中的初始化 Promise
+          const cached = globalVideoFrameCache.get(cacheKey);
+          if (cached) {
+            cached.initializingPromise = null;
+          }
+          throw error;
+        }
+      })();
+      
+      // 保存初始化 Promise 到缓存
+      globalVideoFrameCache.set(cacheKey, {
+        initializingPromise,
+        initialized: false
+      });
+      
+      await initializingPromise;
       } catch (error) {
         const isWorker = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
         const threadInfo = isWorker ? '[Worker]' : '[Main]';
-        console.error(`${threadInfo} [VideoElement] 初始化失败: ${this.videoPath}`, error);
+        console.error(`${threadInfo} [VideoElement] 外层初始化失败: ${this.videoPath}`, error);
         this.initialized = false;
         throw error;
       } finally {
