@@ -203,12 +203,37 @@ export class VideoElement extends BaseElement {
       // 获取输入编解码器
       const inputCodec = getInputCodec(videoStream.codec_name);
 
+      // 计算实际需要提取的视频时长
+      // 如果元素有 duration，只提取 duration 对应的帧数
+      // 否则使用 cutTo - cutFrom（如果指定了）
+      let actualCutFrom = this.cutFrom || 0;
+      let actualCutTo = this.cutTo;
+      
+      if (this.duration && this.duration > 0) {
+        // 元素有 duration，只提取 duration 对应的时长
+        actualCutTo = actualCutFrom + this.duration;
+        
+        // 如果原始 cutTo 存在且更短，使用原始 cutTo
+        if (this.cutTo !== undefined && this.cutTo < actualCutTo) {
+          actualCutTo = this.cutTo;
+        }
+        
+        // 确保不超过视频总时长
+        if (this.videoInfo.duration > 0 && actualCutTo > this.videoInfo.duration) {
+          actualCutTo = this.videoInfo.duration;
+        }
+      }
+      
+      // 保存实际使用的 cutFrom 和 cutTo（用于音频提取等）
+      this.actualCutFrom = actualCutFrom;
+      this.actualCutTo = actualCutTo;
+
       // 构建 FFmpeg 参数
       const args = buildVideoFFmpegArgs({
         inputPath: this.videoPath,
         inputCodec,
-        cutFrom: this.cutFrom,
-        cutTo: this.cutTo,
+        cutFrom: actualCutFrom,
+        cutTo: actualCutTo,
         speedFactor: this.speedFactor,
         framerate: this.fps || 30,
         scaleFilter,
@@ -412,8 +437,8 @@ export class VideoElement extends BaseElement {
           
           this.audioStream = await createAudioStream({
             source: this.videoPath,
-            cutFrom: this.cutFrom,
-            cutTo: this.cutTo,
+            cutFrom: this.actualCutFrom,
+            cutTo: this.actualCutTo,
             speedFactor: this.speedFactor,
             volume: this.volume,
             outputDir: outputDir
@@ -442,7 +467,7 @@ export class VideoElement extends BaseElement {
 
   /**
    * 获取当前帧的 Image 对象
-   * @param {number} progress - 进度 (0-1)
+   * @param {number} progress - 进度 (0-1)，基于元素的 duration
    * @returns {Promise<Image|null>} 当前帧的 Image 对象
    */
   async getFrameAtProgress(progress) {
@@ -463,18 +488,38 @@ export class VideoElement extends BaseElement {
 
       let rgba;
 
-      if (this.frameBuffer.length > 0) {
-        // 从缓冲的帧中根据 progress 获取
+      if (this.frameBuffer.length > 0 && this.videoInfo) {
+        // frameBuffer 现在只包含元素 duration 对应的帧
+        // 所以实际视频时长就是元素的 duration
+        const elementDuration = this.duration || 0;
+        
+        // progress 是基于元素的 duration 计算的（0-1）
+        // progress * elementDuration 表示元素已经播放的时间
+        // 这个时间直接对应 frameBuffer 中的帧索引
+        
+        // 根据视频时间和 FPS 计算帧索引
+        const videoFps = this.videoInfo.fps || 30;
         let frameIndex;
+        
+        if (elementDuration > 0) {
+          // 使用元素的 duration 来计算视频时间（正常速度播放）
+          const videoTime = progress * elementDuration;
+          frameIndex = Math.floor(videoTime * videoFps);
+        } else {
+          // 如果元素没有设置 duration，使用 progress 直接计算帧索引
+          frameIndex = Math.floor(progress * this.frameBuffer.length);
+        }
+        
+        // 确保帧索引在缓冲范围内
+        // frameBuffer 包含的是元素 duration 对应的帧
+        // 索引范围是 0 到 frameBuffer.length - 1
+        frameIndex = Math.max(0, Math.min(frameIndex, this.frameBuffer.length - 1));
+        
         if (this.loop) {
           // 循环模式：使用模运算
-          frameIndex = Math.floor(progress * this.frameBuffer.length) % this.frameBuffer.length;
-        } else {
-          // 非循环模式：直接根据 progress 计算帧索引
-          frameIndex = Math.floor(progress * this.frameBuffer.length);
-          // 确保索引在有效范围内
-          frameIndex = Math.max(0, Math.min(frameIndex, this.frameBuffer.length - 1));
+          frameIndex = frameIndex % this.frameBuffer.length;
         }
+        
         rgba = this.frameBuffer[frameIndex];
       } else {
         // 如果没有缓冲（不应该发生），尝试从迭代器获取
