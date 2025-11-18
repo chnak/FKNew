@@ -1,24 +1,26 @@
-# 依赖
+# Dependencies
 node_modules/
-package-lock.json
-yarn.lock
-output/
-# 构建输出
+
+# Build output
 dist/
-build/
-*.log
-assets/
-# 输出文件
+
+# Output files
 output/
 *.mp4
-*.webm
 *.gif
-temp_frames_*/
+*.png
+*.jpg
+*.jpeg
 
-# 环境变量
-.env
-.env.local
-.env.*.local
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
 
 # IDE
 .vscode/
@@ -27,16 +29,6 @@ temp_frames_*/
 *.swo
 *~
 
-# 操作系统
-.DS_Store
-Thumbs.db
-
-# 测试
-coverage/
-.nyc_output/
-
-# 临时文件
+# Temporary files
 *.tmp
 *.temp
-.cache/
-

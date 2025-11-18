@@ -2,21 +2,32 @@
   "name": "FKvideo-spritejs",
   "version": "1.0.3",
   "description": "基于 Creatomate 配置结构的视频制作库，使用 Paper.js 渲染引擎",
-  "main": "index.cjs",
-  "module": "index.js",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
   "type": "module",
   "exports": {
     ".": {
-      "import": "./index.js",
-      "require": "./index.cjs"
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js",
+      "default": "./dist/esm/index.js"
     }
   },
+  "files": [
+    "dist",
+    "src",
+    "index.js",
+    "README.md"
+  ],
   "scripts": {
+    "build": "node build.js",
+    "build:watch": "node build.js --watch",
+    "prepublishOnly": "npm run build",
     "start": "node examples/basic-composition.js",
     "example:basic": "node examples/basic-composition.js",
     "example:text": "node examples/text-animation.js",
     "example:image": "node examples/image-slideshow.js",
-    "test": "node test-spritejs-basic.js"
+    "test": "node test-spritejs-basic.js",
+    "test:fit": "node examples/test-fit-parameters.js"
   },
   "keywords": [
     "video",
@@ -58,6 +69,7 @@
     "**/canvas": "^3.2.0"
   },
   "devDependencies": {
+    "esbuild": "^0.19.12",
     "eslint": "^8.57.0"
   },
   "engines": {
