@@ -43,7 +43,8 @@ export class AudioElement extends BaseElement {
       const ffmpeg = new FFmpegUtil();
       
       // 使用 FFprobe 获取音频信息
-      const { execa } = await import('execa');
+      const execaModule = await import('execa');
+      const execa = execaModule.default || execaModule.execa || execaModule;
       const { stdout } = await execa('ffprobe', [
         '-v', 'error',
         '-show_entries', 'format=duration',

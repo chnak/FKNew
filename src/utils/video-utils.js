@@ -1,5 +1,5 @@
 import { Transform } from "stream";
-import { execa } from 'execa';
+import execa from 'execa';
 
 /**
  * 视频处理工具函数

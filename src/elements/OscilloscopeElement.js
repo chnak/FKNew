@@ -5,7 +5,7 @@ import { deepMerge } from '../utils/helpers.js';
 import { toPixels } from '../utils/unit-converter.js';
 import fs from 'fs-extra';
 import path from 'path';
-import { execa } from 'execa';
+import execa from 'execa';
 import paper from 'paper-jsdom-canvas';
 import { ensureRenderersLoaded, getRenderer } from './oscilloscope/renderer-loader.js';
 

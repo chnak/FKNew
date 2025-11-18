@@ -105,92 +105,10 @@ function fixFilenameDeclarations(dir) {
       // 如果 import_meta 只用于 __filename，也可以移除
       // 但为了安全，先只移除声明
       
-      // 修复 execa 的 require（execa v9 是纯 ES Module）
-      // 将 require("execa") 改为动态 import 的包装
-      if (content.includes('require("execa")') || content.includes("require('execa')")) {
-        // 创建 execa 的异步包装器
-        // execa v9 导出的是 { execa } 或 default
-        content = content.replace(
-          /var import_execa = require\(["']execa["']\);/g,
-          `// execa is ES Module, using dynamic import
-let _execaModule = null;
-async function getExeca() {
-  if (!_execaModule) {
-    _execaModule = await import("execa");
-  }
-  // execa v9 可能是 { execa } 或 default
-  return _execaModule.execa || _execaModule.default || _execaModule;
-}
-// 预加载 execa 模块（在第一次调用时）
-let _execaLoaded = false;
-let _execaLoadPromise = null;
-
-function ensureExecaLoaded() {
-  if (!_execaLoadPromise) {
-    _execaLoadPromise = getExeca().then(execaFn => {
-      _execaLoaded = true;
-      return execaFn;
-    });
-  }
-  return _execaLoadPromise;
-}
-
-var import_execa = {
-  execa: function(...args) {
-    // 如果 execa 已经加载，直接调用
-    if (_execaLoaded && _execaModule) {
-      const execaFn = _execaModule.execa || _execaModule.default || _execaModule;
-      if (typeof execaFn === 'function') {
-        return execaFn(...args);
-      } else if (execaFn && typeof execaFn.execa === 'function') {
-        return execaFn.execa(...args);
-      }
-    }
-    
-    // 否则，需要先加载 execa
-    const execaPromise = ensureExecaLoaded().then(execaFn => {
-      // execa 可能是函数本身，或者需要调用
-      if (typeof execaFn === 'function') {
-        return execaFn(...args);
-      } else if (execaFn && typeof execaFn.execa === 'function') {
-        return execaFn.execa(...args);
-      }
-      throw new Error('Failed to load execa');
-    });
-    
-    // 创建一个代理对象，立即设置 stdin/stdout/stderr
-    // 这些属性会在 execa 加载后可用
-    const proxy = {
-      then: execaPromise.then.bind(execaPromise),
-      catch: execaPromise.catch.bind(execaPromise),
-      finally: execaPromise.finally.bind(execaPromise),
-    };
-    
-    // 异步设置 stdin/stdout/stderr
-    execaPromise.then(process => {
-      if (process) {
-        proxy.stdin = process.stdin;
-        proxy.stdout = process.stdout;
-        proxy.stderr = process.stderr;
-        // 复制其他属性和方法
-        Object.keys(process).forEach(key => {
-          if (!(key in proxy)) {
-            proxy[key] = process[key];
-          }
-        });
-      }
-    }).catch(() => {});
-    
-    return proxy;
-  }
-};`
-        );
-        
-        // 修复 execa 的调用方式
-        // 将 (0, import_execa.execa) 改为 await import_execa.execa
-        // 但需要确保调用者已经使用了 await
-        // 实际上，由于 import_execa.execa 已经是异步函数，应该可以正常工作
-      }
+      // execa@5 支持 CommonJS，可以直接 require
+      // esbuild 的 __toESM 函数会自动处理 CommonJS 模块的导入
+      // 将 module.exports = execa 包装为 { default: execa }
+      // 所以不需要额外的处理
       
       // 如果文件使用了 fetch，确保 File API polyfill 已加载
       // 在文件开头添加 File API polyfill（如果还没有）

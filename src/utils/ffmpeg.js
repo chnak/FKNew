@@ -1,4 +1,4 @@
-import { execa } from 'execa';
+import execa from 'execa';
 import path from 'path';
 import fs from 'fs-extra';
 import { DEFAULT_FFMPEG_CONFIG } from '../types/constants.js';

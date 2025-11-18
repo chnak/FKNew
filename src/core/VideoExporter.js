@@ -1349,7 +1349,8 @@ export class VideoExporter {
 
     try {
       // 使用 FFmpeg 将视频转换为 GIF
-      const { execa } = await import('execa');
+      const execaModule = await import('execa');
+      const execa = execaModule.default || execaModule.execa || execaModule;
       await execa('ffmpeg', [
         '-y',
         '-hide_banner', // 隐藏版本信息横幅

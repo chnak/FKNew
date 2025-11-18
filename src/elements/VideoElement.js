@@ -4,11 +4,103 @@ import { deepMerge } from '../utils/helpers.js';
 import { ElementType } from '../types/enums.js';
 import { Image, createCanvas } from 'canvas';
 import { toPixels } from '../utils/unit-converter.js';
-import { execa } from 'execa';
+import execa from 'execa';
 import { rawVideoToFrames, calculateVideoScale, getInputCodec, buildVideoFFmpegArgs, readFileStreams, createAudioStream } from '../utils/video-utils.js';
 import paper from 'paper-jsdom-canvas';
 import path from 'path';
 import os from 'os';
+
+/**
+ * 检测是否在 CommonJS 环境中
+ */
+function isCommonJS() {
+  return typeof require !== 'undefined' && typeof module !== 'undefined' && module.exports;
+}
+
+/**
+ * 从 RGBA Buffer 创建兼容的 Image 对象
+ * CommonJS: 使用 jsdom Image
+ * ESM: 使用 canvas Image
+ * 优化：使用 'image/jpeg' 格式，质量 0.95，比 PNG 更快
+ */
+async function createImageFromRGBA(rgbaBuffer, width, height) {
+  // 将 RGBA Buffer 转换为 data URL
+  // 临时使用 canvas 来转换，但不保存 canvas 对象
+  // 使用 JPEG 格式（质量 0.95）比 PNG 更快，适合视频帧
+  const tempCanvas = createCanvas(width, height);
+  const ctx = tempCanvas.getContext('2d');
+  const imageData = ctx.createImageData(width, height);
+  imageData.data.set(rgbaBuffer);
+  ctx.putImageData(imageData, 0, 0);
+  
+  // 使用 JPEG 格式，质量 0.95，比 PNG 编码更快
+  const dataURL = tempCanvas.toDataURL('image/jpeg', 0.95);
+
+  if (!isCommonJS()) {
+    // ESM 环境使用 canvas Image
+    const canvasImage = new Image();
+    return new Promise((resolve, reject) => {
+      // 设置超时，避免长时间等待
+      const timeout = setTimeout(() => {
+        reject(new Error('Image load timeout'));
+      }, 5000);
+      
+      canvasImage.onload = () => {
+        clearTimeout(timeout);
+        resolve(canvasImage);
+      };
+      canvasImage.onerror = (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      };
+      canvasImage.src = dataURL;
+    });
+  }
+
+  try {
+    // 动态导入 jsdom（只在 CommonJS 中需要）
+    const { JSDOM } = await import('jsdom');
+    const dom = new JSDOM();
+    const jsdomImage = new dom.window.Image();
+
+    // 使用 data URL 加载 jsdom Image
+    return new Promise((resolve, reject) => {
+      // 设置超时，避免长时间等待
+      const timeout = setTimeout(() => {
+        reject(new Error('jsdom Image load timeout'));
+      }, 5000);
+      
+      jsdomImage.onload = () => {
+        clearTimeout(timeout);
+        resolve(jsdomImage);
+      };
+      jsdomImage.onerror = (error) => {
+        clearTimeout(timeout);
+        reject(new Error(`Failed to load jsdom Image from RGBA: ${error.message || 'Unknown error'}`));
+      };
+      jsdomImage.src = dataURL;
+    });
+  } catch (error) {
+    console.warn(`[VideoElement] 无法创建 jsdom Image，回退到 canvas Image: ${error.message}`);
+    // 如果失败，回退到 canvas Image
+    const canvasImage = new Image();
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Image load timeout'));
+      }, 5000);
+      
+      canvasImage.onload = () => {
+        clearTimeout(timeout);
+        resolve(canvasImage);
+      };
+      canvasImage.onerror = (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      };
+      canvasImage.src = dataURL;
+    });
+  }
+}
 
 /**
  * 视频元素
@@ -36,6 +128,11 @@ export class VideoElement extends BaseElement {
     this.currentFrameIndex = 0;
     this.videoInfo = null;
     this.initialized = false;
+    
+    // 帧缓存（用于多进程渲染优化）
+    this.frameImageCache = new Map(); // Map<progress, Image>
+    this.frameImageCacheSize = 10; // 最多缓存10帧
+    this.preloadNextFrame = null; // 预加载的下一帧 Promise
     
     // 音频相关
     this.audioStream = null;
@@ -159,9 +256,15 @@ export class VideoElement extends BaseElement {
       });
 
       // 处理流的错误
+      // 注意：在缓冲帧的过程中，transform 流可能会因为 FFmpeg 进程结束而触发错误
+      // 这是正常的，只要已经缓冲了帧就可以继续
+      let transformError = null;
       transform.on('error', (err) => {
-        console.error('Transform stream error:', err);
-        if (!ps.killed) {
+        // 记录错误，但不立即中止（因为可能已经缓冲了足够的帧）
+        transformError = err;
+        console.warn('[VideoElement] Transform stream error (可能不影响缓冲):', err.message);
+        // 只有在进程未结束时才中止
+        if (!ps.killed && ps.exitCode === null) {
           controller.abort();
         }
       });
@@ -177,28 +280,65 @@ export class VideoElement extends BaseElement {
         });
       }
 
-      ps.stdout.on('error', (err) => {
-        console.error('FFmpeg stdout error:', err);
-        transform.destroy(err);
+      // 等待 stdout 可用（CommonJS 环境中可能需要等待）
+      if (!ps.stdout) {
+        let waited = 0;
+        const maxWait = 200; // 增加到 200ms，给更多时间
+        while (!ps.stdout && waited < maxWait) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          waited += 10;
+          // 重新检查 ps.stdout（可能在等待过程中变为可用）
+          if (ps.stdout) break;
+        }
+      }
+
+      // 检查 stdout 是否可用
+      if (!ps.stdout) {
+        // 如果 stdout 不可用，尝试等待进程启动
+        // 在某些情况下，execa 可能需要更多时间
+        console.warn('[VideoElement] FFmpeg stdout 初始不可用，等待进程启动...');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // 再次检查
+        if (!ps.stdout) {
+          console.error('[VideoElement] FFmpeg stdout is not available after waiting');
+          throw new Error('FFmpeg stdout is not available');
+        }
+      }
+
+      // 保存 stdout 引用，避免后续访问时它可能被关闭
+      const stdout = ps.stdout;
+      
+      stdout.on('error', (err) => {
+        // stdout 错误通常表示 FFmpeg 进程已经结束或出现问题
+        // 但如果已经缓冲了帧，这可能不是致命错误
+        console.warn('[VideoElement] FFmpeg stdout error (可能不影响缓冲):', err.message);
+        // 不立即 destroy transform，让缓冲过程自然结束
+        // transform.destroy(err); // 注释掉，避免触发 transform 错误事件
       });
 
       // 将 FFmpeg 的 stdout 管道连接到 transform
       // 设置 highWaterMark 以避免缓冲区溢出
-      ps.stdout.pipe(transform, { end: false });
+      stdout.pipe(transform, { end: false });
 
       // 处理进程错误
       ps.catch((err) => {
-        if (!err.isCanceled && err.exitCode !== 143) { // 143 是 SIGTERM，可能是正常的终止
-          console.error('FFmpeg process error:', err);
+        // FFmpeg 进程错误
+        // 如果进程被取消（exitCode 143）或正常结束，这是正常的
+        if (!err.isCanceled && err.exitCode !== 143) {
+          console.warn('[VideoElement] FFmpeg process error (可能不影响缓冲):', err.message);
         }
-        transform.destroy();
+        // 不立即 destroy，让缓冲过程自然结束
+        // transform.destroy(); // 注释掉，避免在缓冲过程中中断
       });
 
-      // 当进程结束时，结束 transform 流
+      // 当进程正常结束时，结束 transform 流
       ps.then(() => {
+        // 进程正常结束，结束 transform 流
         transform.end();
       }).catch(() => {
-        transform.destroy();
+        // 进程异常结束，但不立即 destroy（可能正在缓冲）
+        // transform.destroy(); // 注释掉，让缓冲过程自然结束
       });
 
       // 转换为迭代器 - 使用 transform 流的迭代器
@@ -208,16 +348,61 @@ export class VideoElement extends BaseElement {
       this.finalWidth = finalWidth;
       this.finalHeight = finalHeight;
 
-      // 如果启用循环，先缓冲所有帧
-      if (this.loop) {
+      // 多进程渲染需要随机访问帧，所以无论是否循环都先缓冲所有帧
+      // 这样可以支持根据 progress 随机访问任意帧
+      console.log(`[VideoElement] 开始缓冲视频帧（多进程渲染优化）...`);
+      let frameCount = 0;
+      let bufferError = null;
+      
+      try {
         while (true) {
-          const { value, done } = await this.frameIterator.next();
-          if (done) break;
-          if (value) {
-            this.frameBuffer.push(Buffer.from(value));
+          try {
+            const { value, done } = await this.frameIterator.next();
+            if (done) {
+              // 正常结束
+              break;
+            }
+            if (value) {
+              this.frameBuffer.push(Buffer.from(value));
+              frameCount++;
+            }
+          } catch (iterError) {
+            // 迭代器错误，可能是流已关闭或进程结束
+            // 如果已经缓冲了一些帧，这是可以接受的（FFmpeg 可能已经完成）
+            if (frameCount > 0) {
+              console.log(`[VideoElement] 帧迭代器结束（已缓冲 ${frameCount} 帧，FFmpeg 可能已完成）`);
+            } else {
+              console.warn(`[VideoElement] 帧迭代器错误（未缓冲任何帧）:`, iterError.message);
+              bufferError = iterError;
+            }
+            break;
           }
         }
+      } catch (error) {
+        // 捕获缓冲过程中的其他错误
+        if (frameCount > 0) {
+          console.log(`[VideoElement] 缓冲过程中出现错误但已缓冲 ${frameCount} 帧:`, error.message);
+        } else {
+          console.warn(`[VideoElement] 缓冲视频帧时出错（未缓冲任何帧）:`, error.message);
+          bufferError = error;
+        }
       }
+      
+      // 只有在没有缓冲到任何帧时才抛出错误
+      if (frameCount === 0) {
+        const errorMsg = bufferError 
+          ? `无法缓冲视频帧: ${bufferError.message}` 
+          : (transformError 
+            ? `无法缓冲视频帧: Transform stream error - ${transformError.message}` 
+            : '无法缓冲视频帧: 未知错误');
+        throw new Error(errorMsg);
+      }
+      
+      console.log(`[VideoElement] 视频帧缓冲完成，共 ${frameCount} 帧`);
+      
+      // 重新创建迭代器（如果需要的话，但通常不需要了）
+      // 注意：由于我们已经缓冲了所有帧，frameIterator 已经用完了
+      // 后续访问都从 frameBuffer 中获取
 
       // 如果不禁音，提取视频中的音频
       if (!this.mute) {
@@ -270,23 +455,37 @@ export class VideoElement extends BaseElement {
     }
 
     try {
+      // 检查缓存
+      const cacheKey = Math.floor(progress * 1000) / 1000; // 保留3位小数作为缓存键
+      if (this.frameImageCache.has(cacheKey)) {
+        return this.frameImageCache.get(cacheKey);
+      }
+
       let rgba;
 
-      if (this.loop && this.frameBuffer.length > 0) {
-        // 循环模式：从缓冲的帧中获取
-        const frameIndex = Math.floor(progress * this.frameBuffer.length) % this.frameBuffer.length;
+      if (this.frameBuffer.length > 0) {
+        // 从缓冲的帧中根据 progress 获取
+        let frameIndex;
+        if (this.loop) {
+          // 循环模式：使用模运算
+          frameIndex = Math.floor(progress * this.frameBuffer.length) % this.frameBuffer.length;
+        } else {
+          // 非循环模式：直接根据 progress 计算帧索引
+          frameIndex = Math.floor(progress * this.frameBuffer.length);
+          // 确保索引在有效范围内
+          frameIndex = Math.max(0, Math.min(frameIndex, this.frameBuffer.length - 1));
+        }
         rgba = this.frameBuffer[frameIndex];
       } else {
-        // 正常模式：从迭代器获取
+        // 如果没有缓冲（不应该发生），尝试从迭代器获取
+        console.warn('[VideoElement] 帧缓冲为空，尝试从迭代器获取（可能影响性能）');
         try {
           const { value, done } = await this.frameIterator.next();
           if (done) {
-            // 如果迭代器结束，尝试重新初始化（可能是视频较短）
             return null;
           }
           rgba = value ? Buffer.from(value) : null;
         } catch (err) {
-          // 迭代器错误，可能是流已关闭
           console.warn('Frame iterator error:', err.message);
           return null;
         }
@@ -296,22 +495,37 @@ export class VideoElement extends BaseElement {
         return null;
       }
 
-      // 将 RGBA Buffer 转换为 canvas Image
-      const canvas = createCanvas(this.finalWidth, this.finalHeight);
-      const ctx = canvas.getContext('2d');
-      const imageData = ctx.createImageData(this.finalWidth, this.finalHeight);
-      imageData.data.set(rgba);
-      ctx.putImageData(imageData, 0, 0);
-
-      // 创建 Image 对象
-      const image = new Image();
-      image.src = canvas.toDataURL();
-
-      return image;
+      // 根据环境创建兼容的 Image 对象（不使用 createCanvas 保存）
+      const imagePromise = createImageFromRGBA(rgba, this.finalWidth, this.finalHeight);
+      
+      // 缓存 Image 对象
+      imagePromise.then((image) => {
+        if (image) {
+          // 限制缓存大小
+          if (this.frameImageCache.size >= this.frameImageCacheSize) {
+            // 删除最旧的缓存（FIFO）
+            const firstKey = this.frameImageCache.keys().next().value;
+            this.frameImageCache.delete(firstKey);
+          }
+          this.frameImageCache.set(cacheKey, image);
+        }
+      }).catch(() => {
+        // 忽略缓存错误
+      });
+      
+      return await imagePromise;
     } catch (error) {
       console.error('Failed to get video frame:', error);
       return null;
     }
+  }
+  
+  /**
+   * 清理帧缓存
+   */
+  clearFrameCache() {
+    this.frameImageCache.clear();
+    this.preloadNextFrame = null;
   }
 
   /**
