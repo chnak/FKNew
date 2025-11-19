@@ -159,8 +159,25 @@ export class FFmpegUtil {
 
     // 监听进程错误（但不阻塞写入）
     let processError = null;
+    let stderrOutput = '';
+    
+    // 监听 stderr 输出（用于调试）
+    if (ffmpegProcess.stderr) {
+      ffmpegProcess.stderr.on('data', (data) => {
+        const text = data.toString();
+        stderrOutput += text;
+        // 如果输出包含错误信息，记录它
+        if (text.includes('error') || text.includes('Error') || text.includes('failed')) {
+          console.warn(`[FFmpeg stderr] ${text.trim()}`);
+        }
+      });
+    }
+    
     ffmpegProcess.catch((error) => {
       processError = error;
+      if (stderrOutput) {
+        console.error(`[FFmpeg stderr 完整输出]:\n${stderrOutput}`);
+      }
     });
 
     // 创建 Promise 来等待编码完成
@@ -174,13 +191,19 @@ export class FFmpegUtil {
     });
 
     // 监听进程完成
-    ffmpegProcess.then(() => {
+    ffmpegProcess.then((result) => {
+      console.log('[FFmpeg] 进程正常退出');
       if (finishResolve) finishResolve(outputPath);
     }).catch((error) => {
+      console.error('[FFmpeg] 进程异常退出:', error.message);
+      if (stderrOutput) {
+        console.error(`[FFmpeg stderr 完整输出]:\n${stderrOutput}`);
+      }
       if (finishReject) finishReject(new Error(`FFmpeg encoding failed: ${error.message}`));
     });
 
     // 写入帧的函数
+    let framesWrittenCount = 0;
     const writeFrame = async (buffer) => {
       if (processError) {
         throw new Error(`FFmpeg process error: ${processError.message}`);
@@ -191,6 +214,15 @@ export class FFmpegUtil {
       if (ffmpegProcess.stdin.destroyed) {
         throw new Error('FFmpeg stdin is closed');
       }
+      
+      // 检查 buffer 是否有效
+      if (!buffer || !Buffer.isBuffer(buffer)) {
+        throw new Error(`Invalid buffer: expected Buffer, got ${typeof buffer}`);
+      }
+      if (buffer.length === 0) {
+        throw new Error('Buffer is empty');
+      }
+      
       try {
         await new Promise((resolve, reject) => {
           // 再次检查是否已关闭
@@ -198,20 +230,36 @@ export class FFmpegUtil {
             reject(new Error('FFmpeg stdin was closed during write'));
             return;
           }
-          ffmpegProcess.stdin.write(buffer, (error) => {
+          
+          // 检查进程是否还在运行
+          if (processError) {
+            reject(new Error(`FFmpeg process error: ${processError.message}`));
+            return;
+          }
+          
+          const writeResult = ffmpegProcess.stdin.write(buffer, (error) => {
             if (error) {
               reject(new Error(`Failed to write frame to FFmpeg: ${error.message}`));
             } else {
+              framesWrittenCount++;
               resolve();
             }
           });
+          
+          // 如果 write 返回 false，说明缓冲区已满，等待 drain 事件
+          if (writeResult === false) {
+            ffmpegProcess.stdin.once('drain', () => {
+              framesWrittenCount++;
+              resolve();
+            });
+          }
         });
       } catch (error) {
         // 如果错误信息已经包含详细信息，直接抛出
         if (error.message.includes('FFmpeg') || error.message.includes('stdin')) {
           throw error;
         }
-        throw new Error(`Failed to write frame to FFmpeg: ${error.message}`);
+        throw new Error(`Failed to write frame to FFmpeg (已写入 ${framesWrittenCount} 帧): ${error.message}`);
       }
     };
 
@@ -231,8 +279,16 @@ export class FFmpegUtil {
 
     // 结束写入的函数
     const end = () => {
+      console.log(`[FFmpeg] 准备关闭 stdin 管道（已写入 ${framesWrittenCount} 帧）...`);
       if (ffmpegProcess.stdin && !ffmpegProcess.stdin.destroyed) {
-        ffmpegProcess.stdin.end();
+        try {
+          ffmpegProcess.stdin.end();
+          console.log('[FFmpeg] stdin 管道已关闭');
+        } catch (error) {
+          console.error('[FFmpeg] 关闭 stdin 时出错:', error.message);
+        }
+      } else {
+        console.warn('[FFmpeg] stdin 已关闭或不存在');
       }
     };
 

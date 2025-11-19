@@ -140,7 +140,8 @@ export class Renderer {
     const paperInstance = this.getPaperInstance();
     
     // 渲染所有图层到 Paper.js
-    for (const layer of sortedLayers) {
+    for (let i = 0; i < sortedLayers.length; i++) {
+      const layer = sortedLayers[i];
       if (layer.isActiveAtTime(time)) {
         // 使用 Paper.js 渲染（支持异步）
         // 传递 paperInstance 给图层，图层再传递给元素

@@ -28,6 +28,7 @@ async function renderSegment() {
     compositionData,
     transitionRanges = [], // 转场范围，Worker 需要跳过这些帧
     fontInfo = [], // 字体信息，用于在 Worker 中注册字体
+    useRaw = true, // 是否使用 raw 格式（默认 true，如果有转场则为 false）
   } = workerData;
 
   try {
@@ -414,7 +415,8 @@ async function renderSegment() {
 
         // 正常渲染帧（支持 onFrame、onRender 回调）
         await renderer.renderFrame(composition.timeline.getLayers(), time, backgroundColor);
-        const buffer = renderer.getCanvasBuffer();
+        // 根据 useRaw 参数决定返回的格式（如果有转场，使用 PNG；否则使用 raw）
+        const buffer = renderer.getCanvasBuffer(useRaw ? 'raw' : 'png');
 
         if (!buffer) {
           console.warn(`[Worker ${segmentIndex}] 帧 ${frame} 渲染失败：buffer 为空`);
@@ -447,12 +449,20 @@ async function renderSegment() {
     // 清理
     renderer.destroy();
 
-    // 发送结果
+    // 收集所有 Buffer 用于 transferList（零拷贝传输）
+    const transferList = [];
+    for (const frame of frames) {
+      if (Buffer.isBuffer(frame.buffer)) {
+        transferList.push(frame.buffer.buffer); // 使用 ArrayBuffer
+      }
+    }
+
+    // 发送结果（使用 transferList 进行零拷贝传输）
     parentPort.postMessage({
       success: true,
       segmentIndex,
       frames,
-    });
+    }, transferList);
   } catch (error) {
     parentPort.postMessage({
       success: false,

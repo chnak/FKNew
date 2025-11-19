@@ -30,16 +30,26 @@ export class ElementLayer extends BaseLayer {
     });
 
     // 渲染所有元素（按 zIndex 顺序）
-    for (const element of sortedElements) {
+    for (let i = 0; i < sortedElements.length; i++) {
+      const element = sortedElements[i];
       // 检查元素是否在指定时间激活（使用相对时间）
       if (element.visible && element.isActiveAtTime && element.isActiveAtTime(time)) {
         try {
           // 在渲染之前先初始化元素（如果还未初始化）
           if (typeof element.isInitialized === 'function' && !element.isInitialized()) {
             if (typeof element.initialize === 'function') {
+              const initStartTime = Date.now();
               const initResult = element.initialize();
               if (initResult && typeof initResult.then === 'function') {
-                await initResult;
+                // 添加超时保护（10秒）
+                await Promise.race([
+                  initResult,
+                  new Promise((_, reject) => setTimeout(() => reject(new Error(`元素 ${element.type || 'unknown'} 初始化超时（10秒）`)), 10000))
+                ]);
+              }
+              const initDuration = Date.now() - initStartTime;
+              if (initDuration > 1000) {
+                console.warn(`  [ElementLayer] 元素 ${element.type || 'unknown'} 初始化耗时 ${initDuration}ms`);
               }
             }
           }
@@ -47,9 +57,18 @@ export class ElementLayer extends BaseLayer {
           // 使用 Paper.js 渲染
           if (typeof element.render === 'function') {
             // 支持异步渲染，传递 paperInstance 给元素
+            const renderStartTime = Date.now();
             const result = element.render(layer, time, paperInstance);
             if (result && typeof result.then === 'function') {
-              await result;
+              // 添加超时保护（10秒）
+              await Promise.race([
+                result,
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`元素 ${element.type || 'unknown'} 渲染超时（10秒）`)), 10000))
+              ]);
+            }
+            const renderDuration = Date.now() - renderStartTime;
+            if (renderDuration > 1000) {
+              console.warn(`  [ElementLayer] 元素 ${element.type || 'unknown'} 渲染耗时 ${renderDuration}ms`);
             }
             
             // 记录已渲染的元素（用于 onFrame 回调）
@@ -58,8 +77,11 @@ export class ElementLayer extends BaseLayer {
             console.warn(`元素 ${element.type || 'unknown'} 没有 render 方法`);
           }
         } catch (error) {
-          console.error(`渲染元素失败 (${element.type || 'unknown'}, id: ${element.id}):`, error);
-          console.error('错误堆栈:', error.stack);
+          console.error(`渲染元素失败 (${element.type || 'unknown'}, id: ${element.id}):`, error.message);
+          if (error.stack) {
+            console.error('错误堆栈:', error.stack.split('\n').slice(0, 5).join('\n'));
+          }
+          throw error;
         }
       }
     }

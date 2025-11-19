@@ -341,21 +341,6 @@ export class VideoExporter {
         const frames = await this.preRenderTransitionFrames(composition, transition, backgroundColor);
         transitionFrames.set(transitionKey, frames);
       }
-      console.log('转场帧预渲染完成');
-    }
-    
-    // 调试信息：打印转场信息
-    if (transitions.length > 0) {
-      console.log(`转场信息:`);
-      transitions.forEach((t, i) => {
-        // 确保 startTime 和 endTime 存在且正确
-        const tStartTime = t.startTime !== undefined ? t.startTime : 0;
-        const tEndTime = t.endTime !== undefined ? t.endTime : (tStartTime + (t.duration || 0));
-        const duration = t.duration || 0;
-        console.log(`  转场 ${i + 1}: ${t.name}, 时间范围: ${tStartTime.toFixed(3)}s - ${tEndTime.toFixed(3)}s, 时长: ${duration.toFixed(3)}s`);
-      });
-    } else {
-      console.log('未检测到转场');
     }
     
     try {
@@ -405,7 +390,12 @@ export class VideoExporter {
           }
           
           // 直接写入 FFmpeg 管道
-          await pipe.writeFrame(buffer);
+          try {
+            await pipe.writeFrame(buffer);
+          } catch (writeError) {
+            console.error(`写入第 ${frame + 1} 帧失败:`, writeError.message);
+            throw writeError;
+          }
 
           // 显示进度
           if (frame % 30 === 0 || frame === totalFrames - 1) {
@@ -422,10 +412,25 @@ export class VideoExporter {
       }
       
       // 所有帧写入完成，关闭管道
-      pipe.end();
+      console.log(`所有 ${totalFrames} 帧已写入，关闭 FFmpeg 输入管道...`);
+      
+      if (pipe && pipe.end) {
+        try {
+          pipe.end();
+        } catch (error) {
+          console.error('关闭管道时出错:', error.message);
+        }
+      }
       
       // 等待 FFmpeg 编码完成
-      await pipe.finish;
+      console.log('等待 FFmpeg 编码完成...');
+      try {
+        await pipe.finish;
+        console.log('FFmpeg 编码完成');
+      } catch (error) {
+        console.error('FFmpeg 编码失败:', error.message);
+        throw error;
+      }
     } catch (error) {
       // 确保关闭管道
       try {
@@ -806,6 +811,7 @@ export class VideoExporter {
           compositionData,
           transitionRanges, // 传递转场范围，让 Worker 跳过转场帧
           fontInfo, // 传递字体信息，让 Worker 注册字体
+          useRaw, // 传递格式信息，让 Worker 知道应该返回什么格式
         },
       });
       
@@ -1110,6 +1116,7 @@ export class VideoExporter {
     // 写入帧到管道的函数（转场帧会在预处理完成后自动添加）
     const writeFramesToPipe = async () => {
       let transitionFramesAdded = false; // 标记转场帧是否已添加
+      let framesWritten = 0; // 记录已写入的帧数
       
       while (!frameBuffer.isComplete() || frameBuffer.getBufferedCount() > 0 || !transitionPreprocessCompleted || (!transitionFramesAdded && transitionFrames.size > 0)) {
         // 检查是否已取消
@@ -1133,11 +1140,17 @@ export class VideoExporter {
             if (isCancelled) {
               break;
             }
-            await pipe.writeFrame(buffer);
+            try {
+              await pipe.writeFrame(buffer);
+              framesWritten++;
+            } catch (error) {
+              console.error(`写入帧失败 (已写入 ${framesWritten} 帧):`, error.message);
+              throw error;
+            }
           }
         } else if (allWorkersCompleted && transitionPreprocessCompleted && transitionFramesAdded) {
           // 所有 Worker 和转场预处理都已完成，转场帧已添加，检查是否还有帧
-          if (frameBuffer.isComplete()) {
+          if (frameBuffer.isComplete() && frameBuffer.getBufferedCount() === 0) {
             break;
           }
         } else {
@@ -1145,6 +1158,8 @@ export class VideoExporter {
           await new Promise(resolve => setTimeout(resolve, 10));
         }
       }
+      
+      console.log(`帧写入完成，共写入 ${framesWritten} 帧`);
     };
     
     for (const segment of segments) {
@@ -1160,6 +1175,7 @@ export class VideoExporter {
           compositionData,
           transitionRanges, // 传递转场范围，让 Worker 跳过转场帧
           fontInfo, // 传递字体信息，让 Worker 注册字体
+          useRaw, // 传递格式信息，让 Worker 知道应该返回什么格式
         },
       });
       
@@ -1204,7 +1220,30 @@ export class VideoExporter {
               if (isTransitionFrame) {
                 continue; // 跳过转场帧
               }
-              frameBuffer.addFrame(frameData.frameIndex, frameData.buffer);
+              
+              // 确保 buffer 是 Buffer 类型
+              // 使用 transferList 后，Buffer 应该已经是正确的类型
+              let buffer = frameData.buffer;
+              if (!Buffer.isBuffer(buffer)) {
+                // 如果使用 transferList，Buffer 的底层 ArrayBuffer 会被转移
+                // 需要从 ArrayBuffer 重新创建 Buffer
+                if (buffer && buffer.buffer && buffer.buffer instanceof ArrayBuffer) {
+                  buffer = Buffer.from(buffer.buffer, buffer.byteOffset || 0, buffer.byteLength || buffer.length);
+                } else if (buffer && typeof buffer === 'object' && buffer.type === 'Buffer' && Array.isArray(buffer.data)) {
+                  // JSON 序列化的情况
+                  buffer = Buffer.from(buffer.data);
+                } else if (buffer && buffer.data && Buffer.isBuffer(buffer.data)) {
+                  buffer = buffer.data;
+                } else if (buffer && typeof buffer === 'object' && buffer.length !== undefined) {
+                  // 可能是类数组对象，尝试转换
+                  buffer = Buffer.from(buffer);
+                } else {
+                  console.error(`[VideoExporter] 无法转换 buffer 为 Buffer 类型: ${typeof buffer}`, buffer);
+                  continue; // 跳过无效的帧
+                }
+              }
+              
+              frameBuffer.addFrame(frameData.frameIndex, buffer);
             }
             
             completedWorkers++;
@@ -1253,11 +1292,53 @@ export class VideoExporter {
         return; // 如果已取消，直接返回
       }
       
+      // 确保所有帧都已写入
+      const remainingFrames = frameBuffer.getBufferedCount();
+      console.log(`所有帧写入完成，缓冲区剩余: ${remainingFrames} 帧`);
+      
+      // 如果还有未写入的帧，继续写入
+      if (remainingFrames > 0) {
+        console.log(`继续写入剩余的 ${remainingFrames} 帧...`);
+        while (frameBuffer.getBufferedCount() > 0) {
+          const framesToWrite = frameBuffer.getNextFrames();
+          if (framesToWrite.length > 0) {
+            for (const { buffer } of framesToWrite) {
+              await pipe.writeFrame(buffer);
+            }
+          } else {
+            break;
+          }
+        }
+      }
+      
+      // 验证所有帧都已写入
+      const finalRemaining = frameBuffer.getBufferedCount();
+      if (finalRemaining > 0) {
+        console.warn(`警告: 仍有 ${finalRemaining} 帧未写入`);
+      }
+      
+      console.log('关闭 FFmpeg 输入管道...');
+      
       // 关闭管道
-      pipe.end();
+      if (pipe && pipe.end) {
+        try {
+          pipe.end();
+        } catch (error) {
+          console.error('关闭管道时出错:', error.message);
+        }
+      } else {
+        console.warn('警告: pipe.end() 不可用');
+      }
       
       // 等待 FFmpeg 编码完成
-      await pipe.finish;
+      console.log('等待 FFmpeg 编码完成...');
+      try {
+        await pipe.finish;
+        console.log('FFmpeg 编码完成');
+      } catch (error) {
+        console.error('FFmpeg 编码失败:', error.message);
+        throw error;
+      }
     } catch (error) {
       cleanup();
       // 移除信号监听器
@@ -1291,19 +1372,6 @@ export class VideoExporter {
         const frames = await this.preRenderTransitionFrames(composition, transition, backgroundColor);
         transitionFrames.set(transitionKey, frames);
       }
-      console.log('转场帧预渲染完成');
-    }
-    
-    // 调试信息：打印转场信息
-    if (transitions.length > 0) {
-      console.log(`转场信息:`);
-      transitions.forEach((t, i) => {
-        // 确保 startTime 和 endTime 存在且正确
-        const tStartTime = t.startTime !== undefined ? t.startTime : 0;
-        const tEndTime = t.endTime !== undefined ? t.endTime : (tStartTime + (t.duration || 0));
-        const duration = t.duration || 0;
-        console.log(`  转场 ${i + 1}: ${t.name}, 时间范围: ${tStartTime.toFixed(3)}s - ${tEndTime.toFixed(3)}s, 时长: ${duration.toFixed(3)}s`);
-      });
     }
     
     for (let frame = 0; frame < totalFrames; frame++) {
