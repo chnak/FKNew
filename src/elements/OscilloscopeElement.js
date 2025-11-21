@@ -10,9 +10,7 @@ import paper from 'paper';
 import { ensureRenderersLoaded, getRenderer } from './oscilloscope/renderer-loader.js';
 
 // 在模块加载时预加载渲染器（非阻塞）
-ensureRenderersLoaded().catch(err => {
-  console.warn('[OscilloscopeElement] 预加载渲染器失败:', err.message);
-});
+
 
 /**
  * 示波器元素 - 可视化音频波形
@@ -57,12 +55,19 @@ export class OscilloscopeElement extends BaseElement {
     // 初始化状态
     this._initialized = false;
   }
+
+  async ready() {
+    await super.ready();
+    await ensureRenderersLoaded()
+    return true;
+  }
   
   /**
    * 初始化元素（加载音频数据）
    * @returns {Promise<void>}
    */
   async initialize() {
+    await super.initialize();
     // 如果已经初始化，直接返回
     if (this._initialized && this.loaded && this.audioData && this.audioData.length > 0) {
       return;

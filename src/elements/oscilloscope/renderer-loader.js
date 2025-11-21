@@ -10,6 +10,11 @@ const __dirname = path.dirname(__filename);
  */
 const renderers = new Map();
 
+function isCommonJS() {
+  return typeof require !== 'undefined' && 
+         typeof module !== 'undefined' && 
+         module.exports;
+}
 /**
  * 自动加载所有渲染器
  */
@@ -26,8 +31,7 @@ export async function loadRenderers() {
   const jsFiles = files.filter(f => f.endsWith('.js') || f.endsWith('.cjs'));
 
   // 检测是否是ESM环境（有import.meta.url）
-  const isESM = typeof import.meta !== 'undefined' && import.meta.url;
-
+  const isESM = !isCommonJS()
   for (const file of jsFiles) {
     try {
       const fileBaseName = path.basename(file, path.extname(file));
@@ -60,6 +64,7 @@ export async function loadRenderers() {
           const rendererModule = require(rendererPath);
           // CommonJS 模块可能使用 exports.default 或直接导出
           renderer = rendererModule.default || rendererModule;
+          
         } catch (requireError) {
           console.warn(`[OscilloscopeRenderer] 无法加载渲染器 ${fileBaseName}:`, requireError.message);
         }

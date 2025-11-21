@@ -11,7 +11,7 @@ import got from 'got';
 import path from 'path';
 import fs from 'fs';
 import {pipeline} from 'stream/promises';
-
+import {registerFontFile} from '../utils/font-manager.js';
 /**
  * 规范化动画配置为统一格式
  * 将动画实例或配置对象转换为纯配置对象，便于序列化和传递
@@ -239,6 +239,11 @@ export class BaseElement {
     }else if(this.config.fontPath&&(this.config.fontPath.startsWith('http'))) {
       this.config.fontPath=await this.download(this.config.fontPath);
       this.fontPath=this.config.fontPath;
+    }
+    if(this.config.fontPath){
+      const fontName=path.basename(this.config.fontPath,path.extname(this.config.fontPath));
+      this.fontFamily=this.config.fontFamily=fontName;
+      registerFontFile(this.config.fontPath,fontName);
     }
     return true;
   }
