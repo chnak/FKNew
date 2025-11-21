@@ -23,7 +23,7 @@ export function rawVideoToFrames({ width, height, channels, signal, ...options }
     writableObjectMode: false,
     readableObjectMode: true,
     // 设置较大的 highWaterMark 以避免缓冲区溢出
-    // highWaterMark: frameByteSize * 10, // 缓冲 10 帧
+    highWaterMark: Math.round(frameByteSize * 5), // 缓冲 10 帧
     transform(chunk, _, callback) {
       try {
         let startAt = 0;

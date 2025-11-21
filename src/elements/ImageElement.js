@@ -30,7 +30,7 @@ export class ImageElement extends BaseElement {
     if(!loaded) {
       await super.initialize();
     }
-    console.log('📊 文件存在:', fs.existsSync(this.src));
+
     if (this.src && !this.loaded) {
       try {
         // 使用 canvas loadImage 加载图片（支持文件路径和 URL）
