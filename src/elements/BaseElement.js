@@ -7,7 +7,10 @@ import { KeyframeAnimation } from '../animations/KeyframeAnimation.js';
 import { AnimationType } from '../types/enums.js';
 import { getPresetAnimation } from '../animations/preset-animations.js';
 import paper from 'paper';
-
+import { got } from 'got';
+import path from 'path';
+import fs from 'fs';
+import {pipeline} from 'stream/promises';
 /**
  * 规范化动画配置为统一格式
  * 将动画实例或配置对象转换为纯配置对象，便于序列化和传递
@@ -163,6 +166,8 @@ function createAnimationFromConfig(animConfig) {
   }
 }
 
+
+
 /**
  * 元素基类
  */
@@ -209,6 +214,138 @@ export class BaseElement {
     this._paperItem = null; // Paper.js 项目引用（用于 onFrame）
   }
 
+
+  async ready() {
+    const src=this.config.src || this.config.videoPath || this.config.audioPath || this.config.svgPath || this.config.imagePath || this.config.jsonPath || this.config.fontPath || null;
+    if(this.config.src&&(src.startsWith('http'))) {
+      this.config.src=await this.download(src);
+      this.src=this.config.src;
+    }else if(this.config.videoPath&&(this.config.videoPath.startsWith('http'))) {
+      this.config.videoPath=await this.download(this.config.videoPath);
+      this.videoPath=this.config.videoPath;
+    }else if(this.config.audioPath&&(this.config.audioPath.startsWith('http'))) {
+      this.config.audioPath=await this.download(this.config.audioPath);
+      this.audioPath=this.config.audioPath;
+    }else if(this.config.svgPath&&(this.config.svgPath.startsWith('http'))) {
+      this.config.svgPath=await this.download(this.config.svgPath);
+      this.svgPath=this.config.svgPath;
+    }else if(this.config.imagePath&&(this.config.imagePath.startsWith('http'))) {
+      this.config.imagePath=await this.download(this.config.imagePath);
+      this.imagePath=this.config.imagePath;
+    }else if(this.config.jsonPath&&(this.config.jsonPath.startsWith('http'))) {
+      this.config.jsonPath=await this.download(this.config.jsonPath);
+      this.jsonPath=this.config.jsonPath;
+    }else if(this.config.fontPath&&(this.config.fontPath.startsWith('http'))) {
+      this.config.fontPath=await this.download(this.config.fontPath);
+      this.fontPath=this.config.fontPath;
+    }
+    return true;
+  }
+  /**
+   * 初始化元素（在渲染之前调用）
+   * 子类可以覆盖此方法来实现异步初始化逻辑（如加载资源）
+   * @returns {Promise<void>|void} 如果返回 Promise，渲染器会等待初始化完成
+   */
+  initialize() {
+    return Promise.resolve();
+  }
+
+
+  async downloadWithPipeline(url, outputPath) {
+    try {
+      const writeStream = fs.createWriteStream(outputPath);
+      
+      await pipeline(
+        got.stream(url),
+        writeStream
+      );
+      
+      console.log(`✅ 下载完成: ${outputPath}`);
+      
+      // 验证文件
+      const stats = fs.statSync(outputPath);
+      if (stats.size === 0) {
+        throw new Error('下载的文件为空');
+      }
+      
+      console.log(`📊 文件大小: ${stats.size} bytes`);
+      return outputPath;
+      
+    } catch (error) {
+      // 清理不完整文件
+      if (fs.existsSync(outputPath)) {
+        fs.unlinkSync(outputPath);
+      }
+      console.error(`❌ 下载失败: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async download(url,name) {
+    try {
+      // 从 URL 提取文件名（处理查询参数）
+      let filename = name || path.basename(url);
+      
+      // 去除查询参数
+      if (filename.includes('?')) {
+        filename = filename.split('?')[0];
+      }
+      
+      // 如果没有扩展名，添加默认扩展名
+      if (!path.extname(filename)) {
+        // 尝试从 Content-Type 推断扩展名
+        const response = await got.head(url);
+        const contentType = response.headers['content-type'];
+        
+        if (contentType === 'image/jpeg') filename += '.jpg';
+        else if (contentType === 'image/png') filename += '.png';
+        else if (contentType === 'video/mp4') filename += '.mp4';
+        else if (contentType === 'video/avi') filename += '.avi';
+        else if (contentType === 'video/quicktime') filename += '.mov';
+        else if (contentType === 'video/x-ms-wmv') filename += '.wmv';
+        else if (contentType === 'video/x-flv') filename += '.flv';
+        else if (contentType === 'video/x-matroska') filename += '.mkv';
+        else if (contentType === 'video/webm') filename += '.webm';
+        else if (contentType === 'audio/mpeg') filename += '.mp3';
+        else if (contentType === 'audio/wav') filename += '.wav';
+        else if (contentType === 'audio/flac') filename += '.flac';
+        else if (contentType === 'audio/aac') filename += '.aac';
+        else if (contentType === 'audio/ogg') filename += '.ogg';
+        else if (contentType === 'audio/x-ms-wma') filename += '.wma';
+        else if (contentType === 'audio/mp4') filename += '.m4a';
+        else if (contentType === 'font/ttf') filename += '.ttf';
+        else if (contentType === 'font/otf') filename += '.otf';
+        else if (contentType === 'font/woff') filename += '.woff';
+        else if (contentType === 'font/woff2') filename += '.woff2';
+        else if (contentType === 'application/vnd.ms-fontobject') filename += '.eot';
+        else if (contentType === 'application/font-sfnt') filename += '.sfnt';
+        else if (contentType === 'application/json') filename += '.json';
+        else if (contentType === 'application/xml') filename += '.xml';
+        else if (contentType === 'application/x-font-ttf') filename += '.ttf';
+        else if (contentType === 'application/x-font-otf') filename += '.otf';
+        else if (contentType === 'application/x-font-woff') filename += '.woff';
+        else if (contentType === 'application/x-font-woff2') filename += '.woff2';
+        else if (contentType === 'application/x-font-eot') filename += '.eot';
+        else if (contentType === 'application/x-font-sfnt') filename += '.sfnt';
+        else if (contentType === 'application/x-font-opentype') filename += '.otf';
+        else if (contentType === 'application/x-font-truetype') filename += '.ttf';
+        else if (contentType === 'application/x-font-woff') filename += '.woff';
+        else filename += '.bin';
+      }
+      
+      const outputPath = path.join(this.cacheDir, filename);
+      
+      const result=await this.downloadWithPipeline(url,outputPath);
+      console.log(`下载完成: ${filename}`);
+
+      return result;
+    } catch (error) {
+      console.error('下载失败:', error.message);
+      throw error;
+    }
+  }
+
+  
   /**
    * 获取元素类型
    */
@@ -678,34 +815,7 @@ export class BaseElement {
   }
 
 
-  async ready() {
-    const src=this.config.src || this.config.videoPath || this.config.audioPath || this.config.svgPath || this.config.imagePath || this.config.jsonPath || this.config.fontPath || null;
-    if(src) {
-      console.log('ready', src);
-    }
-    return true;
-  }
-  /**
-   * 初始化元素（在渲染之前调用）
-   * 子类可以覆盖此方法来实现异步初始化逻辑（如加载资源）
-   * @returns {Promise<void>|void} 如果返回 Promise，渲染器会等待初始化完成
-   */
-  initialize() {
-    // 默认实现为空，子类可以覆盖
-    // 如果子类需要异步初始化，可以返回 Promise
-
-    // else if(this.audioPath) {
-    //   console.log('initialize', this.audioPath);
-    // }else if(this.videoPath) {
-    //   console.log('initialize', this.videoPath);
-    // }else if(this.imagePath) {
-    //   console.log('initialize', this.imagePath);
-    // }else if(this.svgPath) {
-    //   console.log('initialize', this.svgPath);
-    // }
-
-    return Promise.resolve();
-  }
+  
 
   /**
    * 检查元素是否已初始化

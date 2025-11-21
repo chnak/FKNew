@@ -6,7 +6,7 @@ import { loadImage } from 'canvas';
 import { toPixels } from '../utils/unit-converter.js';
 import paper from 'paper';
 import { calculateImageFit } from '../utils/image-fit.js';
-
+import fs from 'fs';
 /**
  * 图片元素
  */
@@ -16,9 +16,9 @@ export class ImageElement extends BaseElement {
     this.type = ElementType.IMAGE;
     // 重新合并配置，确保传入的config优先级最高
     this.config = deepMerge({}, DEFAULT_IMAGE_CONFIG, config);
-    this.src = this.config.src;
     this.imageData = null;
     this.loaded = false;
+
   }
 
   /**
@@ -28,7 +28,8 @@ export class ImageElement extends BaseElement {
     if(!loaded) {
       await super.initialize();
     }
-    if (this.config.src && !this.loaded) {
+    console.log('📊 文件存在:', fs.existsSync(this.src));
+    if (this.src && !this.loaded) {
       try {
         // 使用 canvas loadImage 加载图片（支持文件路径和 URL）
         this.imageData = await loadImage(this.src);

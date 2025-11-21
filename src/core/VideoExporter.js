@@ -38,6 +38,7 @@ export class VideoExporter {
       for (const layer of layers) {
         if (layer.elements) {
           for (const element of layer.elements) {
+              element.cacheDir=this.cacheDir
               allElements.add(element);
           }
         }
@@ -82,11 +83,12 @@ export class VideoExporter {
 
 
       try {
-
-      let audioConfigs = [];
-      await this.preInitializeAllElements(composition);
-      // 使用 collectAllAudioElements 方法收集音频
-      audioConfigs = await composition.collectAllElements();
+        this.cacheDir=path.join(outputDir, `cache_${Date.now()}`);
+        await fs.ensureDir(this.cacheDir);
+        let audioConfigs = [];
+        await this.preInitializeAllElements(composition);
+        // 使用 collectAllAudioElements 方法收集音频
+        audioConfigs = await composition.collectAllElements();
         // 记录渲染开始时间
         const renderStartTime = performance.now();
 
@@ -128,10 +130,11 @@ export class VideoExporter {
             });
           } else {
             // 文件模式 + Worker 并行渲染
-            tempDir = path.join(outputDir, `temp_frames_${Date.now()}`);
+            tempDir = path.join(this.cacheDir, `temp_frames_${Date.now()}`);
             await fs.ensureDir(tempDir);
             await this.renderFramesWithWorker(composition, totalFrames, startTime, fps, tempDir, backgroundColor, {
               numWorkers,
+              useRaw:usePipe,
             });
             console.log('帧渲染完成，开始编码视频...');
           }
@@ -145,7 +148,7 @@ export class VideoExporter {
           });
         } else {
           // 使用文件模式：串行渲染
-          tempDir = path.join(outputDir, `temp_frames_${Date.now()}`);
+          tempDir = path.join(this.cacheDir, `temp_frames_${Date.now()}`);
           await fs.ensureDir(tempDir);
           
           // 渲染并保存到文件
@@ -303,6 +306,7 @@ export class VideoExporter {
       console.error('错误堆栈:', error.stack);
       throw error;
     } finally {
+      await fs.remove(this.cacheDir)
       if (this.renderer) {
         this.renderer.destroy();
       }
@@ -814,7 +818,7 @@ export class VideoExporter {
           compositionData,
           transitionRanges, // 传递转场范围，让 Worker 跳过转场帧
           fontInfo, // 传递字体信息，让 Worker 注册字体
-          useRaw, // 传递格式信息，让 Worker 知道应该返回什么格式
+          useRaw:options.useRaw, // 传递格式信息，让 Worker 知道应该返回什么格式
         },
       });
       

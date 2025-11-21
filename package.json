@@ -55,10 +55,11 @@
     "gl-texture2d": "^2.1.0",
     "gl-transition": "^1.13.0",
     "gl-transitions": "^1.43.0",
+    "got": "^14.6.4",
+    "jsdom": "^16.2.2",
     "lrc-kit": "^1.1.1",
     "nanoid": "^5.0.4",
     "paper": "^0.12.18",
-    "jsdom": "^16.2.2",
     "spritejs": "^3.8.3",
     "zod": "^4.1.12"
   },
