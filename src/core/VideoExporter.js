@@ -215,6 +215,7 @@ export class VideoExporter {
         audioProcessingPromise = this.ffmpeg.mergeAudios(audioConfigs, {
           outputDir: outputDir,
           duration: endTime - startTime,
+          audioMode: options.audioMode || composition.config?.audioMode || 'standard',
         }).then(async mergedAudioPath => {
           if (mergedAudioPath && await fs.pathExists(mergedAudioPath)) {
             console.log('音频处理完成');

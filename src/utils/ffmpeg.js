@@ -431,6 +431,7 @@ export class FFmpegUtil {
     const {
       outputDir = './output',
       duration, // 总时长（秒）
+      audioMode = 'standard', // 混音模式：'standard' | 'fkvideo'
     } = options;
 
     if (!audioConfigs || audioConfigs.length === 0) {
@@ -530,6 +531,7 @@ export class FFmpegUtil {
           processedAudios.push({
             path: processedPath,
             startTime: audio.startTime || 0,
+            mixVolume: audio.volume !== undefined ? audio.volume : 1.0,
           });
         } catch (error) {
           console.warn(`处理音频失败: ${audio.path}`, error.message);
@@ -567,7 +569,15 @@ export class FFmpegUtil {
 
       // 混合所有音频
       const mixInputs = processedAudios.map((_, i) => `[a${i}]`).join('');
-      filterComplex.push(`${mixInputs}amix=inputs=${processedAudios.length}:duration=longest:dropout_transition=0[out]`);
+      if (audioMode === 'fkvideo') {
+        const weights = processedAudios.map(a => (a.mixVolume !== undefined ? a.mixVolume : 1)).join(' ');
+        filterComplex.push(`${mixInputs}amix=inputs=${processedAudios.length}:duration=longest:dropout_transition=0:normalize=0:weights=${weights}[out]`);
+      } else {
+        // 使用 normalize=0 保持输入素材的原始能量，不因输入数量被等分
+        filterComplex.push(`${mixInputs}amix=inputs=${processedAudios.length}:duration=longest:dropout_transition=0:normalize=0[out0]`);
+        // 默认仅应用响度规范（EBU R128）
+        filterComplex.push(`[out0]loudnorm=I=-23:LRA=7:TP=-2[out]`);
+      }
 
       const args = [
         '-y',
@@ -591,8 +601,6 @@ export class FFmpegUtil {
         return outputPath;
       } catch (error) {
         console.warn('合并音频失败，尝试简单方式:', error.message);
-        
-        // 如果复杂方式失败，尝试简单方式：只使用第一个音频
         if (processedAudios.length > 0) {
           return processedAudios[0].path;
         }
