@@ -119,6 +119,7 @@ export class CodeElement extends BaseElement {
 
     this.highlighter = new SyntaxHighlighter(this.language);
     this.highlightedLines = this.highlighter.highlight(this.code);
+    this.config.scrollPaddingBottom =  this.padding
     
     // 缓存用于宽度测量
     this._widthCache = new Map();
@@ -216,7 +217,7 @@ export class CodeElement extends BaseElement {
 
     // 上对齐：使用固定 padding（顶部缩进）
     const paddingPx = this.padding;
-    const paddingBottomPx = this.config.paddingBottom !== undefined ? this.config.paddingBottom : paddingPx;
+    const paddingBottomPx = paddingPx
 
     const lineNumberWidth = this.showLineNumbers ? 50 : 0;
     const contentStartX = pos.x + paddingPx + lineNumberWidth + 8;
@@ -267,7 +268,9 @@ export class CodeElement extends BaseElement {
       }
     }
     const printedLines = lastPrintedLine + 1;
-    const scrollOffsetY = (this.split && this.autoScroll) ? Math.max(0, printedLines * lineHeightPx - contentHeight) : 0;
+    const scrollPadBottomPx = this.config.scrollPaddingBottom !== undefined ? this.config.scrollPaddingBottom : paddingBottomPx;
+    const scrollViewportHeight = Math.max(0, contentHeight - scrollPadBottomPx);
+    const scrollOffsetY = (this.split && this.autoScroll) ? Math.max(0, printedLines * lineHeightPx - scrollViewportHeight) : 0;
 
     const clipExtraTop = Math.max(2, Math.round(fontSize * 0.3));
     const clipExtraBottom = Math.max(2, Math.round(fontSize * 0.6));
