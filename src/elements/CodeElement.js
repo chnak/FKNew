@@ -115,6 +115,7 @@ export class CodeElement extends BaseElement {
     this.cursorBlinkPeriod = this.config.cursorBlinkPeriod || 0.7;
     this.cursorPaddingLeft = 8;
     // this.cursorOffsetY = this.config.cursorOffsetY;
+    this.autoScroll = this.config.autoScroll !== undefined ? this.config.autoScroll : true;
 
     this.highlighter = new SyntaxHighlighter(this.language);
     this.highlightedLines = this.highlighter.highlight(this.code);
@@ -235,8 +236,41 @@ export class CodeElement extends BaseElement {
     const cursorHeight = fontSize;
     const cursorYOffset =  -(fontSize * 0.3);
 
+    const contentWidth = Math.max(0, elementWidth - paddingPx * 2);
+    const contentHeight = Math.max(0, elementHeight - paddingPx * 2);
+    const maxVisibleLines = Math.max(1, Math.floor(contentHeight / lineHeightPx));
+
+    let lastPrintedLine = 0;
+    if (this.split === 'line') {
+      const printed = Math.floor(Math.max(0, time - this.startTime) / this.splitDelay);
+      lastPrintedLine = Math.min(this.highlightedLines.length - 1, printed);
+    } else if (this.split === 'word') {
+      const printed = Math.floor(Math.max(0, time - this.startTime) / this.splitDelay);
+      let remaining = printed;
+      for (let i = 0; i < this.highlightedLines.length; i++) {
+        if (remaining <= 0) break;
+        const tokens = this.highlightedLines[i].tokens;
+        const count = tokens.reduce((acc, t) => acc + (t.type === 'space' ? 0 : 1), 0);
+        remaining -= count;
+        if (remaining >= 0) lastPrintedLine = i;
+      }
+    } else if (this.split === 'letter') {
+      const printed = Math.floor(Math.max(0, time - this.startTime) / this.splitDelay);
+      let remaining = printed;
+      for (let i = 0; i < this.highlightedLines.length; i++) {
+        if (remaining <= 0) break;
+        const tokens = this.highlightedLines[i].tokens;
+        const count = tokens.reduce((acc, t) => acc + t.text.length, 0);
+        remaining -= count;
+        if (remaining >= 0) lastPrintedLine = i;
+      }
+    }
+    const visibleStart = (this.split && this.autoScroll) ? Math.max(0, lastPrintedLine - maxVisibleLines + 1) : 0;
+
     this.highlightedLines.forEach((lineData, idx) => {
-      const centerY = contentStartY + idx * lineHeightPx + (lineHeightPx / 2);
+      const visibleIndex = idx - visibleStart;
+      if (visibleIndex < 0 || visibleIndex >= maxVisibleLines) return;
+      const centerY = contentStartY + visibleIndex * lineHeightPx + (lineHeightPx / 2);
       const fontFamily = state.fontFamily || 'Courier New';
       let currentX = contentStartX;
 
