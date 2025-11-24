@@ -13,6 +13,7 @@ import { AudioElement } from '../elements/AudioElement.js';
 import { SubtitleElement } from '../elements/SubtitleElement.js';
 import { OscilloscopeElement } from '../elements/OscilloscopeElement.js';
 import { CodeElement } from '../elements/CodeElement.js';
+import { EChartsElement } from '../elements/EChartsElement.js';
 import { LRCSubtitleBuilder } from '../utils/lrcSubtitleBuilder.js';
 import { Component } from './Component.js';
 
@@ -282,6 +283,12 @@ export class Scene {
   addCode(config = {}) {
     const codeEl = new CodeElement(config);
     this.elements.push({ type: 'code', element: codeEl });
+    return this;
+  }
+
+  addECharts(config = {}) {
+    const el = new EChartsElement(config);
+    this.elements.push({ type: 'echarts', element: el });
     return this;
   }
 

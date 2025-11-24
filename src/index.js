@@ -49,6 +49,7 @@ export { Scene } from './builder/Scene.js';
 export { Component } from './builder/Component.js';
 export { Transition } from './builder/Transition.js';
 export { CodeElement } from './elements/CodeElement.js';
+export { EChartsElement } from './elements/EChartsElement.js';
 
 // 工具函数
 export * from './utils/helpers.js';

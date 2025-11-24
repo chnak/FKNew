@@ -19,6 +19,7 @@ export class ImageElement extends BaseElement {
     this.src = this.config.src;
     this.imageData = null;
     this.loaded = false;
+    this._warnedMissing = false;
 
   }
   
@@ -33,6 +34,15 @@ export class ImageElement extends BaseElement {
 
     if (this.src && !this.loaded) {
       try {
+        const isUrl = /^https?:\/\//i.test(this.src);
+        if (!isUrl) {
+          try {
+            if (!fs.existsSync(this.src)) {
+              this.loaded = false;
+              return;
+            }
+          } catch (_) {}
+        }
         // 使用 canvas loadImage 加载图片（支持文件路径和 URL）
         this.imageData = await loadImage(this.src);
         this.loaded = true;
@@ -201,7 +211,10 @@ export class ImageElement extends BaseElement {
     }
     
     if (!this.loaded || !this.imageData) {
-      console.warn(`[ImageElement] 图片未加载 (id: ${this.id})`);
+      if (!this._warnedMissing) {
+        console.warn(`[ImageElement] 图片未加载 (id: ${this.id})`);
+        this._warnedMissing = true;
+      }
       return null;
     }
   

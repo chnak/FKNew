@@ -214,6 +214,8 @@ async function renderSegment() {
                 'audio': 'Audio',
                 'oscilloscope': 'Oscilloscope',
                 'subtitle': 'Subtitle',
+                'echarts': 'ECharts',
+                'code': 'Code'
               };
               
               const className = elementTypeMap[elementData.type] || 
