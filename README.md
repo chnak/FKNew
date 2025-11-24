@@ -418,6 +418,69 @@ scene.addJSON({
 });
 ```
 
+### 代码元素（Code）
+
+用于展示带语法高亮的代码块，支持逐行、逐词、逐字的打字动画，行号、光标、自动滚动以及底部滚动留白。
+
+```javascript
+scene.addCode({
+  code: `function hello() {\n  const msg = 'Hello'\n  return msg\n}`,
+  language: 'javascript',
+  theme: 'dark',
+  x: '50%',
+  y: '55%',
+  width: 700,
+  height: 300,
+  anchor: [0.5, 0.5],
+  startTime: 0,
+  duration: 6,
+  fontSize: 24,
+  showLineNumbers: true,
+  showBorder: true,
+  borderRadius: 12,
+  padding: 20
+})
+
+scene.addCode({
+  code: `const items = [1,2,3,4]\nfor (let i = 0; i < 40; i++) {\n  console.log(items[i % items.length])\n}`,
+  language: 'javascript',
+  theme: 'dark',
+  x: '50%',
+  y: '55%',
+  width: 800,
+  height: 260,
+  anchor: [0.5, 0.5],
+  startTime: 0,
+  duration: 8,
+  fontSize: 22,
+  showLineNumbers: true,
+  showBorder: true,
+  borderRadius: 10,
+  padding: 18,
+  paddingBottom: 26,
+  cursor: true,
+  cursorColor: '#00d9ff',
+  cursorWidth: 2,
+  split: 'letter',
+  splitDelay: 0.06,
+  splitDuration: 0.2,
+  autoScroll: true,
+  scrollPaddingBottom: 24
+})
+```
+
+常用选项说明：
+
+- `language` 代码语言标识，例如 `javascript`、`python`、`java`
+- `theme` 主题，例如 `dark`、`monokai`、`dracula`
+- `showLineNumbers` 是否显示行号
+- `showBorder`、`borderRadius` 是否显示边框与圆角
+- `split` 打字模式：`line`（逐行）、`word`（逐词）、`letter`（逐字）；配合 `splitDelay`、`splitDuration`
+- `cursor`、`cursorColor`、`cursorWidth` 光标样式
+- `autoScroll` 自动滚动使最新内容可见
+- `paddingBottom` 布局上的底部内边距
+- `scrollPaddingBottom` 打字滚动过程的底部留白
+
 ## 🎭 转场效果
 
 ```javascript
