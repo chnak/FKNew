@@ -116,7 +116,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 1, scaleY: 1 },
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-back',
+    easing: 'easeOutBack',
   },
   zoomOut: {
     type: 'transform',
@@ -124,7 +124,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 0, scaleY: 0 },
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-back',
+    easing: 'easeInBack',
   },
 
   bigIn: {
@@ -133,7 +133,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 1, scaleY: 1, opacity: 1 },
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-back',
+    easing: 'easeOutBack',
   },
   bigOut: {
     type: 'transform',
@@ -141,7 +141,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 2, scaleY: 2, opacity: 0 },
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-back',
+    easing: 'easeInBack',
   },
   
   // 旋转
@@ -212,7 +212,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 1, scaleY: 1 },
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-bounce',
+    easing: 'easeOutBounce',
   },
   bounceOut: {
     type: 'transform',
@@ -220,7 +220,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 0, scaleY: 0 },
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-bounce',
+    easing: 'easeInBounce',
   },
   
   // 旋转变体
@@ -282,7 +282,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 1, scaleY: 1, rotation: 0 },
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-back',
+    easing: 'easeOutBack',
   },
   zoomRotateOut: {
     type: 'transform',
@@ -290,7 +290,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 0, scaleY: 0, rotation: 180 },
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-back',
+    easing: 'easeInBack',
   },
   
   // 弹跳变体（带方向）
@@ -304,7 +304,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-bounce',
+    easing: 'easeOutBounce',
   },
   bounceInDown: {
     type: 'keyframe',
@@ -316,7 +316,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-bounce',
+    easing: 'easeOutBounce',
   },
   bounceInLeft: {
     type: 'keyframe',
@@ -328,7 +328,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-bounce',
+    easing: 'easeOutBounce',
   },
   bounceInRight: {
     type: 'keyframe',
@@ -340,7 +340,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-bounce',
+    easing: 'easeOutBounce',
   },
   bounceOutUp: {
     type: 'keyframe',
@@ -352,7 +352,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-bounce',
+    easing: 'easeInBounce',
   },
   bounceOutDown: {
     type: 'keyframe',
@@ -364,7 +364,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-bounce',
+    easing: 'easeInBounce',
   },
   
   // 缩放变体（带方向）
@@ -376,7 +376,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-back',
+    easing: 'easeOutBack',
   },
   zoomInDown: {
     type: 'keyframe',
@@ -386,7 +386,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-back',
+    easing: 'easeOutBack',
   },
   zoomInLeft: {
     type: 'keyframe',
@@ -396,7 +396,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-back',
+    easing: 'easeOutBack',
   },
   zoomInRight: {
     type: 'keyframe',
@@ -406,7 +406,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-back',
+    easing: 'easeOutBack',
   },
   zoomOutUp: {
     type: 'keyframe',
@@ -416,7 +416,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-back',
+    easing: 'easeInBack',
   },
   zoomOutDown: {
     type: 'keyframe',
@@ -426,7 +426,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-back',
+    easing: 'easeInBack',
   },
   zoomOutLeft: {
     type: 'keyframe',
@@ -436,7 +436,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-back',
+    easing: 'easeInBack',
   },
   zoomOutRight: {
     type: 'keyframe',
@@ -446,7 +446,7 @@ export const PRESET_ANIMATIONS = {
     ],
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-back',
+    easing: 'easeInBack',
   },
   
   // 翻转效果
@@ -490,7 +490,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 1, scaleY: 1 },
     duration: 0.6,
     delay: 0,
-    easing: 'ease-out-elastic',
+    easing: 'easeOutElastic',
   },
   elasticOut: {
     type: 'transform',
@@ -498,7 +498,7 @@ export const PRESET_ANIMATIONS = {
     to: { scaleX: 0, scaleY: 0 },
     duration: 0.6,
     delay: -1,
-    easing: 'ease-in-elastic',
+    easing: 'easeInElastic',
   },
   
   // 摇摆效果
