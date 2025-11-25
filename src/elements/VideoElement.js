@@ -26,7 +26,7 @@ export class VideoElement extends BaseElement {
     this.fit = config.fit || 'cover'; // cover, contain, fill, none
     this.cutFrom = config.cutFrom||0; // 开始时间（秒）
     this.cutTo = config.cutTo||this.config.duration; // 结束时间（秒）
-    this.speedFactor = config.speedFactor || 1; // 播放速度倍数
+    this.speedFactor = config.speedFactor || config.speed || 1; // 播放速度倍数
     this.loop = config.loop || false; // 是否循环播放
     this.mute = config.mute !== undefined ? config.mute : true; // 默认静音
     this.volume = config.volume !== undefined ? config.volume : 1.0; // 音量

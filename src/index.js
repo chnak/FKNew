@@ -54,6 +54,16 @@ export { EChartsElement } from './elements/EChartsElement.js';
 // 工具函数
 export * from './utils/helpers.js';
 export * from './utils/validator.js';
+export {
+  ElementSchema,
+  AnimationInputSchema,
+  SceneConfigSchema,
+  TrackConfigSchema,
+  VideoBuilderConfigSchema,
+  PresetAnimationNamesSchema,
+  EasingNamesSchema,
+  TransitionNamesSchema,
+} from './utils/validator.js';
 export * from './utils/unit-converter.js';
 export { parseSubtitles, calculateMixedTextCapacity, calculateSpeechTimeMixed } from './utils/subtitle-utils.js';
 export { getAudioDuration } from './utils/audio-utils.js';

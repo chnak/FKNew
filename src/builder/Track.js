@@ -39,7 +39,14 @@ export class Track {
 
   /**
    * 添加转场效果
-   * @param {Object} config - 转场配置 { fromScene, toScene, type, duration }
+   * @param {Object} config - 转场配置
+   * @description
+   * - `name`: 转场名称，取值来自 `AllTransitions`（见 `utils/transition-renderer.js`），支持内置与别名以及 `random`
+   * - `duration`: 转场时长（秒），默认 `0.5`
+   * - `easing`: 缓动函数名称，参考 `easings.js`
+   * - `params`: 转场参数对象（传入 gl-transitions 所需参数）
+   * - `fromScene`/`toScene`: 源/目标场景实例，或使用 `fromSceneIndex`/`toSceneIndex` 指定索引
+   * - `startTime`: 作为“转场结束时间点”（通常等于目标场景的开始时间）
    * @returns {Track} 返回自身以支持链式调用
    */
   addTransition(config = {}) {

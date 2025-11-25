@@ -19,7 +19,7 @@ export class EChartsElement extends BaseElement {
     this.config = deepMerge({}, { option: {}, renderer: 'canvas', theme: null }, config);
     this.option = this.config.option || {};
     this.theme = this.config.theme || null;
-    this.backgroundColor = this.config.backgroundColor || this.config.bgColor || undefined;
+    this.backgroundColor = this.config.backgroundColor || this.config.bgcolor || undefined;
     this._canvas = null;
     this._echarts = null;
     this._ready = false;
