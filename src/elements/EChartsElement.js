@@ -43,7 +43,7 @@ export class EChartsElement extends BaseElement {
     
   }
 
-  
+
   isInitialized() {
     return !!this._ready;
   }
@@ -62,6 +62,7 @@ export class EChartsElement extends BaseElement {
     animation._startLoop = () => (animation._running = true);
     animation.update = function(notTriggerFrameAndStageUpdate, time, delta) {
       let clip = this._head;
+      //console.log(this)
       while (clip) {
         const nextClip = clip.next;
         let finished = clip.onframe(time, delta);
@@ -88,6 +89,7 @@ export class EChartsElement extends BaseElement {
     const { paper: p, project } = this.getPaperInstance(paperInstance);
     const viewSize = project?.view?.viewSize || { width: 1920, height: 1080 };
     const context = { width: viewSize.width, height: viewSize.height };
+    
     const state = this.getStateAtTime(time, context);
     const size = this.convertSize(state.width, state.height, context);
     const width = size.width || viewSize.width;
@@ -109,17 +111,16 @@ export class EChartsElement extends BaseElement {
       } catch (e) {
         // 忽略初始化时可能的错误，render 时继续尝试
       }
-      // 需要重新修补 zrender 的动画方法
-      try { this.fixZrender(this._echarts); } catch (_) {}
-      this._ready = true;
     }
     if (!this._ready) {
       this.fixZrender(this._echarts);
       this._ready = true;
     }
-    const ts = Math.max(0, Math.floor(time * 1000));
+    const rel = time - this.startTime                // 相对秒
+    const relClamped = Math.max(0, Math.min(rel, this.duration || (this.endTime - this.startTime)));
+    const ts = Math.max(0, Math.floor(relClamped * 1000));
     const delta = Math.max(0, ts - (this._lastTimestamp || ts));
-    this.echartsUpdate(this._echarts, time, delta);
+    this.echartsUpdate(this._echarts, relClamped, delta);
     
     
     const raster = new p.Raster(this._canvas);
