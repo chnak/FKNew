@@ -1092,12 +1092,27 @@ export class BaseElement {
    * 销毁元素
    */
   destroy() {
+    try { if (this._paperItem && typeof this._paperItem.remove === 'function') this._paperItem.remove(); } catch (_) {}
+    if (Array.isArray(this.segments)) {
+      for (const s of this.segments) { try { if (s && typeof s.destroy === 'function') s.destroy(); } catch (_) {} }
+      this.segments = [];
+    }
+    try { if (this._cursorItem && typeof this._cursorItem.remove === 'function') this._cursorItem.remove(); } catch (_) {}
+    this._cursorItem = null;
+    try { if (typeof this.clearFrameCache === 'function') this.clearFrameCache(); } catch (_) {}
+    try { if (this._echarts && typeof this._echarts.dispose === 'function') this._echarts.dispose(); } catch (_) {}
+    this._echarts = null;
+    this._canvas = null;
     this.animations = [];
     this.config = {};
     this.parent = null;
     this.onLoaded = null;
     this.onRender = null;
     this._loadedCallbackCalled = false;
+    this._paperItem = null;
+    this._paperInstance = null;
+    this.visible = false;
+    this._destroyed = true;
   }
 }
 

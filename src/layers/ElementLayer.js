@@ -85,6 +85,15 @@ export class ElementLayer extends BaseLayer {
         }
       }
     }
+
+    for (const element of this.elements) {
+      const st = element.startTime !== undefined ? element.startTime : 0;
+      const dur = element.duration !== undefined ? element.duration : undefined;
+      const ended = dur !== undefined ? time >= st + dur : false;
+      if (ended && !element._destroyed && typeof element.destroy === 'function') {
+        try { element.destroy(); } catch (_) {}
+      }
+    }
   }
 
   /**

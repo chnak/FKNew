@@ -111,4 +111,11 @@ export class EChartsElement extends BaseElement {
     this._lastTimestamp = ts;
     return raster;
   }
+
+  destroy() {
+    try { if (this._echarts && typeof this._echarts.dispose === 'function') this._echarts.dispose(); } catch (_) {}
+    this._echarts = null;
+    this._canvas = null;
+    super.destroy();
+  }
 }
