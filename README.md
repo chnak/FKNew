@@ -2,6 +2,16 @@
 
 基于 Node.js + Paper.js 的纯 JavaScript 视频制作库，提供简洁的 API 和强大的功能。
 
+## 🧭 简介
+
+FKbuilder 是一个面向开发者的程序化视频生成库，通过“轨道-场景-元素”的层次化架构与时间线驱动的 API，帮助你用代码构建具有动画、转场、文本特效、图形与图表的高质量视频。
+
+- 面向工程化的工作流：用 JavaScript 组装素材与逻辑，精准控制时间与动画。
+- 丰富的元素生态：文本、图片、视频、形状、音频、字幕、SVG、JSON、代码块、ECharts 图表等。
+- 强大的动画系统：预设动画、关键帧动画、变换动画以及每帧更新的持续动画（onFrame）。
+- 高性能渲染：基于 Paper.js 的 2D 渲染，支持并行渲染与上下文变量传递。
+- 易于集成：简单的 API 设计，适用于生成教程视频、数据可视化短片、产品演示、自动化内容生产等场景。
+
 ## ✨ 核心特性
 
 - 🎬 **多轨道多场景** - 灵活的轨道和场景管理系统，支持复杂的视频结构
@@ -418,6 +428,45 @@ scene.addJSON({
 });
 ```
 
+### ECharts 元素
+
+将 ECharts 图表作为视频中的可视化元素进行渲染。图表动画与视频时间线同步：在元素的第一帧渲染时启动动画，不会在初始化阶段提前播放。
+
+- 用途：在场景中展示柱状图、折线图、饼图等数据可视化。
+- 依赖：需要安装 `echarts`。
+- 关键参数：
+  - `option`：ECharts 配置对象（与浏览器一致）。
+  - `renderer`：渲染方式，`'canvas'|'svg'`，默认 `'canvas'`。
+  - `theme`：ECharts 主题名称或对象。
+  - `backgroundColor`：元素背景色（可与 `option.backgroundColor` 配合）。
+  - `x`, `y`, `width`, `height`, `anchor`：定位与尺寸，单位与其他元素一致。
+  - `startTime`, `duration`：时间线控制，决定元素何时出现与持续时长。
+  - `onFrame`：每帧回调，可在时间线上通过 `setOption` 动态更新数据。
+
+```javascript
+const option = { 
+  animation: true, 
+  animationDuration: 2000, 
+  title: { text: 'ECharts 示例', textStyle: { color: '#fff' } }, 
+  tooltip: {}, 
+  xAxis: { data: ['A','B','C','D','E','F'], axisLine: { lineStyle: { color: '#aaa' } }, axisLabel: { color: '#ddd' } }, 
+  yAxis: { axisLine: { lineStyle: { color: '#aaa' } }, axisLabel: { color: '#ddd' }, splitLine: { lineStyle: { color: '#333' } } }, 
+  series: [{ type: 'bar', data: [5, 20, 36, 10, 10, 20], itemStyle: { color: '#00d9ff' } }] 
+};
+
+scene.addECharts({ 
+  option, 
+  x: '50%', 
+  y: '55%', 
+  width: 900, 
+  height: 500, 
+  backgroundColor: '#8fafeeff', 
+  anchor: [0.5, 0.5], 
+  startTime: 0, 
+  duration: 6 
+});
+```
+
 ### 代码元素（Code）
 
 用于展示带语法高亮的代码块，支持逐行、逐词、逐字的打字动画，行号、光标、自动滚动以及底部滚动留白。
@@ -437,6 +486,8 @@ scene.addCode({
   fontSize: 24,
   showLineNumbers: true,
   showBorder: true,
+  split: 'line',  // 打字模式：'line', 'word', 'letter'
+  splitDelay: 0.1,
   borderRadius: 12,
   padding: 20
 })
