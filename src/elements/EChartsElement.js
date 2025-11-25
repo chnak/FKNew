@@ -19,6 +19,7 @@ export class EChartsElement extends BaseElement {
     this.config = deepMerge({}, { option: {}, renderer: 'canvas', theme: null }, config);
     this.option = this.config.option || {};
     this.theme = this.config.theme || null;
+    this.backgroundColor = this.config.backgroundColor || this.config.bgColor || undefined;
     this._canvas = null;
     this._echarts = null;
     this._ready = false;
@@ -32,7 +33,7 @@ export class EChartsElement extends BaseElement {
     const h = Number(this.config.height) || 1;
     this._canvas = paper.createCanvas(w, h);
     this._echarts = ECharts.init(this._canvas, this.theme, { renderer: this.config.renderer, devicePixelRatio: 1, width: w, height: h });
-    this._echarts.setOption({ animation: true, ...this.option }, true);
+    this._echarts.setOption({ animation: true, ...this.option, backgroundColor: this.backgroundColor }, true);
     
   }
 
