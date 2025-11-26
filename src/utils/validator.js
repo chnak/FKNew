@@ -355,6 +355,29 @@ export const CodeElementSchema = ElementBaseSchema.extend({
   cursorBlinkPeriod: z.number().optional().describe('光标闪烁周期'),
 }).describe('代码元素');
 
+export const SpriteElementSchema = ElementBaseSchema.extend({
+  type: z.literal('sprite'),
+  spriteType: z.enum(['Sprite', 'Rect', 'Circle', 'Label']).optional().describe('Sprite 类型'),
+  spriteConfig: z.record(z.any()).optional().describe('Sprite 配置对象'),
+  frames: z.array(z.string()).optional().describe('序列帧图片路径数组'),
+  frameRate: z.number().positive().optional().describe('帧率（帧/秒）'),
+  loop: z.boolean().optional().describe('是否循环播放'),
+  autoplay: z.boolean().optional().describe('是否自动播放'),
+  playMode: z.enum(['forward', 'reverse', 'pingpong']).optional().describe('播放模式'),
+  fit: z.enum(['contain', 'cover', 'fill', 'scale-down', 'none']).optional().describe('缩放模式'),
+  preserveAspectRatio: z.boolean().optional().describe('保持纵横比'),
+  src: z.string().optional().describe('精灵图图片路径'),
+  columns: z.number().positive().optional().describe('图集中列数（每行帧数）'),
+  rows: z.number().positive().optional().describe('图集中行数'),
+  frameWidth: z.number().positive().optional().describe('单帧宽度（像素）'),
+  frameHeight: z.number().positive().optional().describe('单帧高度（像素）'),
+  frameCount: z.number().positive().optional().describe('总帧数'),
+  margin: z.number().min(0).optional().describe('外边距（像素）'),
+  spacing: z.number().min(0).optional().describe('帧间距（像素）'),
+  startIndex: z.number().min(0).optional().describe('起始帧索引'),
+  orientation: z.enum(['row-major', 'column-major']).optional().describe('索引扫描方式'),
+}).describe('精灵元素');
+
 export const JSONElementSchema = ElementBaseSchema.extend({
   type: z.literal('json'),
   src: z.string().optional().describe('JSON 文件路径'),
@@ -377,6 +400,7 @@ export const ElementSchema = z.discriminatedUnion('type', [
   OscilloscopeElementSchema,
   EChartsElementSchema,
   CodeElementSchema,
+  SpriteElementSchema,
   JSONElementSchema,
 ]).describe('元素联合 Schema，根据 type 选择具体结构');
 

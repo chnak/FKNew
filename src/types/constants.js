@@ -226,6 +226,11 @@ export const DEFAULT_SPRITE_CONFIG = {
   ...DEFAULT_ELEMENT_CONFIG,
   spriteType: 'Sprite',
   spriteConfig: {},
+  // 可选的起始位置（优先级低于元素的 x/y 或 动画），支持数字或百分比字符串
+  startX: undefined,
+  startY: undefined,
+  // 也支持数组形式: startPosition: [x, y]
+  startPosition: undefined,
 };
 
 export const DEFAULT_JSON_CONFIG = {

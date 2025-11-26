@@ -14,6 +14,7 @@ import { SubtitleElement } from '../elements/SubtitleElement.js';
 import { OscilloscopeElement } from '../elements/OscilloscopeElement.js';
 import { CodeElement } from '../elements/CodeElement.js';
 import { EChartsElement } from '../elements/EChartsElement.js';
+import { SpriteElement } from '../elements/SpriteElement.js';
 import { LRCSubtitleBuilder } from '../utils/lrcSubtitleBuilder.js';
 import { Component } from './Component.js';
 
@@ -204,6 +205,15 @@ export class Scene {
     this.elements.push({
       type: 'json',
       element: jsonElement,
+    });
+    return this;
+  }
+
+  addSprite(config = {}) {
+    const spriteElement = new SpriteElement(config);
+    this.elements.push({
+      type: 'sprite',
+      element: spriteElement,
     });
     return this;
   }
@@ -481,6 +491,26 @@ export class Scene {
       config.fadeIn = element.fadeIn !== undefined ? element.fadeIn : elementConfig.fadeIn;
       config.fadeOut = element.fadeOut !== undefined ? element.fadeOut : elementConfig.fadeOut;
       config.loop = element.loop !== undefined ? element.loop : elementConfig.loop;
+    } else if (element.type === 'sprite') {
+      config.spriteType = element.spriteType !== undefined ? element.spriteType : elementConfig.spriteType;
+      config.spriteConfig = element.spriteConfig !== undefined ? element.spriteConfig : elementConfig.spriteConfig;
+      config.frames = element.frames !== undefined ? element.frames : elementConfig.frames;
+      config.frameRate = element.frameRate !== undefined ? element.frameRate : elementConfig.frameRate;
+      config.loop = element.loop !== undefined ? element.loop : elementConfig.loop;
+      config.autoplay = element.autoplay !== undefined ? element.autoplay : elementConfig.autoplay;
+      config.playMode = element.playMode !== undefined ? element.playMode : elementConfig.playMode;
+      config.fit = element.fit !== undefined ? element.fit : elementConfig.fit;
+      config.preserveAspectRatio = element.preserveAspectRatio !== undefined ? element.preserveAspectRatio : elementConfig.preserveAspectRatio;
+      config.src = element.src !== undefined ? element.src : elementConfig.src;
+      config.columns = element.columns !== undefined ? element.columns : elementConfig.columns;
+      config.rows = element.rows !== undefined ? element.rows : elementConfig.rows;
+      config.frameWidth = element.frameWidth !== undefined ? element.frameWidth : elementConfig.frameWidth;
+      config.frameHeight = element.frameHeight !== undefined ? element.frameHeight : elementConfig.frameHeight;
+      config.frameCount = element.frameCount !== undefined ? element.frameCount : elementConfig.frameCount;
+      config.margin = element.margin !== undefined ? element.margin : elementConfig.margin;
+      config.spacing = element.spacing !== undefined ? element.spacing : elementConfig.spacing;
+      config.startIndex = element.startIndex !== undefined ? element.startIndex : elementConfig.startIndex;
+      config.orientation = element.orientation !== undefined ? element.orientation : elementConfig.orientation;
     }
 
     return config;
