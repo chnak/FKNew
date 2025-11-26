@@ -852,7 +852,7 @@ export class VideoExporter {
             
             // 只在总体进度变化超过 1% 时打印，避免输出过多
             if (Math.abs(overallProgress - lastOverallProgress) >= 1 || overallProgress >= 100) {
-              console.log(`总体进度: ${overallProgress.toFixed(1)}% (${totalCompletedFrames}/${totalWorkerFrames} 帧) | [Worker ${segmentIndex}] ${progress}%`);
+              process.stdout.write(`\r总体进度: ${overallProgress.toFixed(1)}% (${totalCompletedFrames}/${totalWorkerFrames} 帧) | [Worker ${segmentIndex}] ${progress}%                    `);
               lastOverallProgress = overallProgress;
             }
             
@@ -1219,7 +1219,7 @@ export class VideoExporter {
             
             // 只在总体进度变化超过 1% 时打印，避免输出过多
             if (Math.abs(overallProgress - lastOverallProgress) >= 1 || overallProgress >= 100) {
-              console.log(`总体进度: ${overallProgress.toFixed(1)}% (${totalCompletedFrames}/${totalWorkerFrames} 帧) | [Worker ${segmentIndex}] ${progress}%`);
+              process.stdout.write(`\r总体进度: ${overallProgress.toFixed(1)}% (${totalCompletedFrames}/${totalWorkerFrames} 帧) | [Worker ${segmentIndex}] ${progress}%                    `);
               lastOverallProgress = overallProgress;
             }
             
