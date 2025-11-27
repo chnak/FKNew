@@ -15,6 +15,7 @@ import { OscilloscopeElement } from '../elements/OscilloscopeElement.js';
 import { CodeElement } from '../elements/CodeElement.js';
 import { EChartsElement } from '../elements/EChartsElement.js';
 import { SpineElement } from '../elements/SpineElement.js';
+import { SpriteElement } from '../elements/SpriteElement.js';
 import { LRCSubtitleBuilder } from '../utils/lrcSubtitleBuilder.js';
 import { Component } from './Component.js';
 
@@ -124,6 +125,15 @@ export class Scene {
     this.elements.push({
       type: 'spine',
       element: spineElement,
+    });
+    return this;
+  }
+
+  addSprite(config = {}) {
+    const spriteElement = new SpriteElement(config);
+    this.elements.push({
+      type: 'sprite',
+      element: spriteElement,
     });
     return this;
   }
