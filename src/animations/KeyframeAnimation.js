@@ -19,6 +19,14 @@ export class KeyframeAnimation extends Animation {
   addKeyframe(time, props) {
     this.keyframes.push({ time, props });
     this.keyframes.sort((a, b) => a.time - b.time);
+    const maxKFTime = this.keyframes.reduce((m, kf) => {
+      const t = (kf && typeof kf.time === 'number') ? kf.time : 0;
+      return Math.max(m, t);
+    }, 0);
+    if (maxKFTime > 1.000001 && (this.config.duration === undefined || this.config.duration < maxKFTime)) {
+      this.config.duration = maxKFTime;
+      this.endTime = this.startTime + this.config.duration;
+    }
   }
 
   /**
@@ -26,6 +34,14 @@ export class KeyframeAnimation extends Animation {
    */
   setKeyframes(keyframes) {
     this.keyframes = keyframes.sort((a, b) => a.time - b.time);
+    const maxKFTime = this.keyframes.reduce((m, kf) => {
+      const t = (kf && typeof kf.time === 'number') ? kf.time : 0;
+      return Math.max(m, t);
+    }, 0);
+    if (maxKFTime > 1.000001 && (this.config.duration === undefined || this.config.duration < maxKFTime)) {
+      this.config.duration = maxKFTime;
+      this.endTime = this.startTime + this.config.duration;
+    }
   }
 
   /**
@@ -35,15 +51,22 @@ export class KeyframeAnimation extends Animation {
     if (this.keyframes.length === 0) return {};
 
     const progress = this.getEasedProgress(time);
-    const normalizedTime = progress * this.config.duration;
+    const duration = this.config.duration || 1;
 
-    // 找到当前时间所在的关键帧区间
+    const maxKFTime = this.keyframes.reduce((m, kf) => {
+      const t = (kf && typeof kf.time === 'number') ? kf.time : 0;
+      return Math.max(m, t);
+    }, 0);
+
+    const useSeconds = maxKFTime > 1.000001;
+    const normalizedTime = useSeconds ? (time - this.startTime) : (progress * duration);
+
     let startKeyframe = this.keyframes[0];
     let endKeyframe = this.keyframes[this.keyframes.length - 1];
 
     for (let i = 0; i < this.keyframes.length - 1; i++) {
-      const currentTime = this.keyframes[i].time * this.config.duration;
-      const nextTime = this.keyframes[i + 1].time * this.config.duration;
+      const currentTime = useSeconds ? this.keyframes[i].time : (this.keyframes[i].time * duration);
+      const nextTime = useSeconds ? this.keyframes[i + 1].time : (this.keyframes[i + 1].time * duration);
       if (normalizedTime >= currentTime && normalizedTime <= nextTime) {
         startKeyframe = this.keyframes[i];
         endKeyframe = this.keyframes[i + 1];
@@ -51,24 +74,14 @@ export class KeyframeAnimation extends Animation {
       }
     }
 
-    // 计算区间内的插值进度
-    const startTime = startKeyframe.time * this.config.duration;
-    const endTime = endKeyframe.time * this.config.duration;
+    const startTime = useSeconds ? startKeyframe.time : (startKeyframe.time * duration);
+    const endTime = useSeconds ? endKeyframe.time : (endKeyframe.time * duration);
     const segmentDuration = endTime - startTime;
-    const segmentProgress = segmentDuration > 0 
-      ? (normalizedTime - startTime) / segmentDuration 
-      : 0;
+    const segmentProgress = segmentDuration > 0 ? (normalizedTime - startTime) / segmentDuration : 0;
 
-    // 插值所有属性
     const state = {};
-    
-    // 支持两种格式：
-    // 1. { time: 0, props: { opacity: 0, y: 50 } }
-    // 2. { time: 0, opacity: 0, y: 50 } (直接属性)
     const startProps = startKeyframe.props || startKeyframe;
     const endProps = endKeyframe.props || endKeyframe;
-    
-    // 排除 time 属性
     const allProps = new Set([
       ...Object.keys(startProps).filter(k => k !== 'time'),
       ...Object.keys(endProps).filter(k => k !== 'time'),
@@ -77,9 +90,6 @@ export class KeyframeAnimation extends Animation {
     for (const prop of allProps) {
       const startValue = startProps[prop] ?? 0;
       const endValue = endProps[prop] ?? 0;
-      
-      // 对于 x, y 属性，如果是相对值（相对于当前位置），需要特殊处理
-      // 但这里我们直接插值，因为预设动画中的 x, y 通常是相对偏移量
       state[prop] = lerp(startValue, endValue, segmentProgress);
     }
 
