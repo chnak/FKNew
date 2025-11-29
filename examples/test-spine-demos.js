@@ -40,21 +40,22 @@ async function main() {
       skeleton: skeletonPath,
       atlas,
       timeline: [
-        { name: 'run', loop: true },
-        { name: 'aim', track: 2, at: 1, duration: 1.0, mix: 0.15 },
-        { name: 'death', track: 3, at: 5, duration: 1, mix: 0.2 },
-        { name: 'hoverboard', track: 4, at: 6, duration: 1, mix: 0.2 },
-        { name: 'idle', track: 5, at: 8, duration: 1, mix: 0.2 }
-
-        //aim, death, hoverboard, idle, idle-turn, jump, portal, run, run-to-idle, shoot, walk
+        { name: 'run',   track: 0, loop: true },
+        { name: 'aim',   track: 2, at: 1, duration: 1.0, mix: 0.2 },
+        { name: 'death', track: 3, at: 5, duration: 1.0, mix: 0.2 },
+        { name: 'jump', track: 4, at: 15, duration: 1.0, mix: 0.2 },
+        { name: 'idle', track: 4, at: 20, duration: 1.0, mix: 0.2 },
+        // { name: 'idle', track: 5, at: 8, duration: 1.0, mix: 0.2 }
+        // 可用动画: aim, death, hoverboard, idle, idle-turn, jump, portal, run, run-to-idle, shoot, walk
       ],
       loop: true,
-      width: '50%',
-      height: '50%',
+      width: '30%',
+      height: 400,
       x: '50%',
-      y: '60%',
+      y: '50%',
       duration: 30,
-      fit:'contain',
+      scale: 0.5,
+      bgcolor: 'rgba(255,255,255,0.3)',
       valign: 'bottom',
       animations: [
         {
@@ -68,12 +69,37 @@ async function main() {
         },
       ],
     })
+    .addText({
+      text: "测试文本",
+      color: "#000000",
+      fontSize: 180,
+      x: "50%",
+      y: "50%",
+      textAlign: "center",
+      duration: 30,
+      startTime: 0,
+      animations: [
+        {
+          type: 'keyframe',
+          duration: 30,
+          easing: 'linear',
+          keyframes: [
+            { time: 0, x: 0, translateY: 0 },
+            { time: 1, x:1280, translateY: 0 },
+          ],
+        },
+      ],
+    });
 
   const videoMaker = builder.build()
   const outputDir = path.join(__dirname, '../output')
   await fs.promises.mkdir(outputDir, { recursive: true })
   const outputPath = path.join(outputDir, 'test-spine-demos.mp4')
-  await videoMaker.export(outputPath, { usePipe: true })
+  await videoMaker.export(outputPath, { 
+    usePipe: true, 
+    parallel: true, 
+    maxWorkers: 1 
+  })
   console.log('输出文件:', outputPath)
   videoMaker.destroy()
   builder.destroy()

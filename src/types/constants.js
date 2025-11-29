@@ -242,9 +242,10 @@ export const DEFAULT_SPINE_CONFIG = {
   loop: true,
   scale: 1,
   timeScale: 1,
-  fit: 'contain',
-  valign: 'bottom',
-  suppressWarnings: true,
+  fitFrom: 'natural',
+  clampToContainer: false,
+  bgcolor: null,
+  valign: 'middle',
 };
 
 export const DEFAULT_JSON_CONFIG = {

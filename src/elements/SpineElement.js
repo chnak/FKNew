@@ -1,13 +1,13 @@
-import 'pixi-spine' 
 import { BaseElement } from './BaseElement.js'
 import { DEFAULT_SPINE_CONFIG } from '../types/constants.js'
 import { deepMerge } from '../utils/helpers.js'
 import { ElementType } from '../types/enums.js'
-import * as PIXI from '@pixi/node'
-import {Spine} from 'pixi-spine';
-import { Image, createCanvas } from 'canvas'
+import { Image, createCanvas, loadImage } from 'canvas'
 import fs from 'fs'
 import path from 'path'
+import CanvasKitInit from 'canvaskit-wasm'
+import * as spineck from '@esotericsoftware/spine-canvaskit'
+import { RegionAttachment, MeshAttachment, Utils } from '@esotericsoftware/spine-core'
 
 
 
@@ -16,9 +16,31 @@ export class SpineElement extends BaseElement {
     super(config)
     this.type = ElementType.SPINE
     this.config = deepMerge({}, DEFAULT_SPINE_CONFIG, config)
-    this._pixi = null
+    this._ck = null
     this._lastTime = null
     this._appliedSchedule = new Set()
+    if (!Array.isArray(this.config.animSchedule) && Array.isArray(this.config.timeline) && this.config.timeline.length > 0) {
+      const sch = []
+      for (const item of this.config.timeline) {
+        const baseTrack = Number(item && item.track) >= 0 ? Number(item.track) : 0
+        const loop = !!(item && item.loop)
+        const mix = (item && item.mix != null) ? item.mix : null
+        const at = Number(item && item.at) >= 0 ? Number(item.at) : 0
+        const duration = Number(item && item.duration) > 0 ? Number(item.duration) : null
+        const delay = Number(item && item.delay) >= 0 ? Number(item.delay) : 0
+        const action = (item && item.action) ? item.action : 'set'
+        const namesArr = Array.isArray(item?.name) ? item.name : (item?.name ? [item.name] : [])
+        for (let i = 0; i < namesArr.length; i++) {
+          const n = namesArr[i]
+          const track = Number(baseTrack) + i
+          sch.push({ track, name: n, action, start: at, loop, mix, delay })
+          if (duration != null) {
+            sch.push({ track, action: 'empty', start: at + duration, end: at + duration, mix })
+          }
+        }
+      }
+      this.config.animSchedule = sch
+    }
   }
 
    _disableWarnings() {
@@ -185,116 +207,209 @@ export class SpineElement extends BaseElement {
     }
     const width = 1
     const height = 1
-    const app = new PIXI.Application({ width, height, backgroundColor: 0x000000, backgroundAlpha: 0, preserveDrawingBuffer: true, transparent: true })
-    if (app?.renderer?.background) {
-      app.renderer.background.color = 0x000000
-      app.renderer.background.alpha = 0
+    const wasmDir = path.join(process.cwd(), 'node_modules', 'canvaskit-wasm', 'bin')
+    const CanvasKit = await CanvasKitInit({ locateFile: (f) => path.join(wasmDir, f) })
+    const surface = CanvasKit.MakeSurface(width, height)
+    const canvas = surface.getCanvas()
+
+    const atlasFileForModule = expectedAtlas.replace(/\\/g, '/')
+    const skeletonFileForModule = skeletonPath.replace(/\\/g, '/')
+    const ckAtlas = await spineck.loadTextureAtlas(CanvasKit, atlasFileForModule, (p) => fs.promises.readFile(p))
+    let skeletonData = null
+    try {
+      skeletonData = await spineck.loadSkeletonData(skeletonFileForModule, ckAtlas, (p) => fs.promises.readFile(p), scale || 1)
+    } catch (_) {
+      const candidateJson = fs.existsSync(path.join(assetsDir, `${baseName}.json`)) ? path.join(assetsDir, `${baseName}.json`) : (jsonFile ? path.join(assetsDir, jsonFile) : null)
+      if (!candidateJson) throw _
+      const jsonModPath = candidateJson.replace(/\\/g, '/')
+      skeletonData = await spineck.loadSkeletonData(jsonModPath, ckAtlas, (p) => fs.promises.readFile(p), scale || 1)
     }
-    if (app.ticker && typeof app.ticker.stop === 'function') {
-      app.ticker.stop()
-      app.ticker.autoStart = false
+    const drawable = new spineck.SkeletonDrawable(skeletonData)
+    const renderer = new spineck.SkeletonRenderer(CanvasKit)
+
+    const setupW = Number(drawable?.skeleton?.data?.width) || 0
+    const setupH = Number(drawable?.skeleton?.data?.height) || 0
+
+    let naturalW = width
+    let naturalH = height
+    let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY, maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY
+    let naturalCx = 0, naturalCy = 0
+    const drawOrderInit = drawable.skeleton.drawOrder
+    let positionsInit = Utils.newFloatArray(100)
+    for (let i = 0, n = drawOrderInit.length; i < n; i++) {
+      const slot = drawOrderInit[i]
+      const attachment = slot.getAttachment()
+      if (attachment instanceof RegionAttachment) {
+        if (positionsInit.length < 8) positionsInit = Utils.newFloatArray(8)
+        attachment.computeWorldVertices(slot, positionsInit, 0, 2)
+        for (let ii = 0; ii < 8; ii += 2) { const x = positionsInit[ii]; const y = positionsInit[ii+1]; minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y) }
+      } else if (attachment instanceof MeshAttachment) {
+        const len = attachment.worldVerticesLength
+        if (positionsInit.length < len) positionsInit = Utils.newFloatArray(len)
+        attachment.computeWorldVertices(slot, 0, len, positionsInit, 0, 2)
+        for (let ii = 0; ii < len; ii += 2) { const x = positionsInit[ii]; const y = positionsInit[ii+1]; minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y) }
+      }
     }
+    if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) { naturalW = Math.max(1, maxX - minX); naturalH = Math.max(1, maxY - minY); naturalCx = (minX + maxX) / 2; naturalCy = (minY + maxY) / 2 }
 
-    await PIXI.Assets.init()
-    PIXI.Assets.add({ alias: `${baseName}-skeleton`, src: skeletonPath })
-    const spineRes = await PIXI.Assets.load(`${baseName}-skeleton`)
-    const spineData = (spineRes && (spineRes.spineData || spineRes.data || spineRes))
-    if (!spineData) return
-
-    const spine = new Spine(spineData)
-    spine.x = width / 2
-    spine.y = height * 0.875
-    spine.scale.set(scale || 1)
-    app.stage.addChild(spine)
-
-    if (spine?.skeleton?.setToSetupPose) {
-      spine.skeleton.setToSetupPose()
-    }
-
-    spine.autoUpdate = false
-    const state = spine.state
-    const sData = (spine.spineData || spine.skeleton?.data || state?.data?.skeletonData || state?.data || {})
-    const anims = Array.isArray(sData.animations) ? sData.animations : []
-    console.log('[SpineElement] anims=%s', anims.map(a => a.name || a.id || '?').join(', '))
-    const available = new Set(anims.map(a => a?.name))
+    this._ck = { CanvasKit, surface, canvas, atlas: ckAtlas, drawable, renderer, naturalW, naturalH, naturalCx, naturalCy, setupW, setupH }
+    this._lastTime = null
+    this._callOnLoaded(this.startTime || 0, null, null)
+    let availableNames = new Set()
+    try {
+      const animsArr = drawable?.skeleton?.data?.animations || []
+      for (const a of animsArr) { const nm = a?.name || a?.id; if (nm) availableNames.add(nm) }
+      if (availableNames.size === 0 && skeletonPath.toLowerCase().endsWith('.json')) {
+        const jsonText2 = fs.readFileSync(skeletonPath, 'utf-8')
+        const parsed2 = JSON.parse(jsonText2)
+        const animsObj = parsed2 && parsed2.animations
+        if (animsObj && typeof animsObj === 'object') {
+          for (const k of Object.keys(animsObj)) availableNames.add(k)
+        }
+      }
+      if (process.env.FK_DEBUG_SPINE === '1') {
+        console.log('[SpineElement] available animations:', Array.from(availableNames).join(', '))
+      }
+    } catch (_) {}
     let schedule = Array.isArray(this.config.animSchedule) ? this.config.animSchedule : null
     const timeline = Array.isArray(this.config.timeline) ? this.config.timeline : null
-
     if (!schedule && timeline && timeline.length > 0) {
+      if (process.env.FK_DEBUG_SPINE === '1') {
+        console.log('[SpineElement] build schedule from timeline, count=%d', timeline.length)
+      }
       const sch = []
       for (const item of timeline) {
-        const baseTrack = (item && item.track != null) ? item.track : 0
+        const baseTrack = Number(item && item.track) >= 0 ? Number(item.track) : 0
         const loop = !!(item && item.loop)
         const mix = (item && item.mix != null) ? item.mix : null
         const at = Number(item && item.at) >= 0 ? Number(item.at) : 0
         const duration = Number(item && item.duration) > 0 ? Number(item.duration) : null
+        const delay = Number(item && item.delay) >= 0 ? Number(item.delay) : 0
+        const action = (item && item.action) ? item.action : 'set'
         const namesArr = Array.isArray(item?.name) ? item.name : (item?.name ? [item.name] : [])
-        const validNames = namesArr.filter(n => available.has(n))
+        const validNames = namesArr.filter(n => availableNames.has(n))
         if (validNames.length === 0) continue
         for (let i = 0; i < validNames.length; i++) {
           const n = validNames[i]
           const track = baseTrack + i
-          sch.push({ track, name: n, action: 'set', start: at, loop, mix })
-          if (duration != null) {
-            sch.push({ track, action: 'empty', start: at + duration, end: at + duration, mix })
-          }
+          sch.push({ track, name: n, action, start: at, loop, mix, delay })
+        if (duration != null) {
+          sch.push({ track, action: 'empty', start: at + duration, end: at + duration, mix })
+        }
         }
       }
       this.config.animSchedule = sch
       schedule = sch
-    }
-
-    if (!schedule && (!timeline || timeline.length === 0)) {
-      const fallback = anims.length > 0 ? (anims[0].name || anims[0].id || null) : null
-      if (fallback) state.setAnimation(0, fallback, this.config.loop !== false)
-    }
-
-    let naturalW = width
-    let naturalH = height
-    try {
-      const prevScaleX = spine.scale.x
-      const prevScaleY = spine.scale.y
-      spine.scale.set(1, 1)
-      app.renderer.render(app.stage)
-      const b = spine.getBounds()
-      if (b && b.width > 0 && b.height > 0) {
-        naturalW = b.width
-        naturalH = b.height
+      if (process.env.FK_DEBUG_SPINE === '1') {
+        console.log('[SpineElement] built animSchedule size=%d', schedule.length)
       }
-      spine.scale.set(prevScaleX, prevScaleY)
-    } catch (_) {}
-
-    this._pixi = { app, spine, naturalW, naturalH }
-    this._lastTime = null
-    this._callOnLoaded(this.startTime || 0, null, null)
+    }
+    if (!schedule && (!timeline || timeline.length === 0)) {
+      const animConf = this.config.anim
+      let chosen = null
+      if (typeof animConf === 'string') {
+        chosen = animConf
+      } else if (Array.isArray(animConf) && animConf.length > 0) {
+        chosen = animConf[0]
+      }
+      if (!chosen) {
+        chosen = Array.from(availableNames)[0] || null
+      }
+      if (chosen) this._ck.drawable.animationState.setAnimation(0, chosen, this.config.loop !== false)
+    }
   }
 
   async render(layer, time, paperInstance = null) {
     if (!this.visible) return null
     if (!this.isActiveAtTime(time)) return null
-    if (!this._pixi) {
+    if (!this._ck) {
       await this.initialize()
-      if (!this._pixi) return null
+      if (!this._ck) return null
     }
 
     const { paper: p, project } = this.getPaperInstance(paperInstance)
     const viewSize = project?.view?.viewSize || { width: 1920, height: 1080 }
     const context = { width: viewSize.width, height: viewSize.height }
     const state = this.getStateAtTime(time, context)
-
     const containerSize = this.convertSize(state.width, state.height, context)
     const containerWidth = containerSize.width || viewSize.width
     const containerHeight = containerSize.height || viewSize.height
-    const pos = this.calculatePosition(state, context, { width: containerWidth, height: containerHeight })
+    const pos = this.calculatePosition(state, context)
 
-    const { app, spine, naturalW, naturalH } = this._pixi
-    const delta = this._lastTime == null ? 0 : Math.max(0, time - this._lastTime)
-    this._lastTime = time
-    const timeScale = this.config.timeScale || 1
-    spine.update(delta * timeScale)
+    const { CanvasKit, surface, canvas, drawable, renderer, naturalW, naturalH, naturalCx, naturalCy } = this._ck
+    const wasFirstFrame = (this._lastTime == null)
+    const delta = wasFirstFrame ? 0 : (time - this._lastTime)
+    const timeScale = (state.timeScale !== undefined ? state.timeScale : this.config.timeScale) || 1
 
-    const schedule = Array.isArray(this.config.animSchedule) ? this.config.animSchedule : null
+    // 先根据绝对时间应用动画日程
+    let schedule = Array.isArray(state.animSchedule) ? state.animSchedule : (Array.isArray(this.config.animSchedule) ? this.config.animSchedule : null)
+    if (!schedule) {
+      const tl = Array.isArray(state.timeline) ? state.timeline : (Array.isArray(this.config.timeline) ? this.config.timeline : null)
+      if (tl && tl.length > 0) {
+        const sch = []
+        for (const item of tl) {
+          const baseTrack = Number(item && item.track) >= 0 ? Number(item.track) : 0
+          const loop = !!(item && item.loop)
+          const mix = (item && item.mix != null) ? item.mix : null
+          const at = Number(item && item.at) >= 0 ? Number(item.at) : 0
+          const duration = Number(item && item.duration) > 0 ? Number(item.duration) : null
+          const delay = Number(item && item.delay) >= 0 ? Number(item.delay) : 0
+          const action = (item && item.action) ? item.action : 'set'
+          const namesArr = Array.isArray(item?.name) ? item.name : (item?.name ? [item.name] : [])
+          for (let i = 0; i < namesArr.length; i++) {
+            const n = namesArr[i]
+            const track = Number(baseTrack) + i
+            sch.push({ track, name: n, action, start: at, loop, mix, delay })
+        if (duration != null) {
+          sch.push({ track, action: 'empty', start: at + duration, end: at + duration, mix })
+        }
+          }
+        }
+        this.config.animSchedule = sch
+        schedule = sch
+        if (process.env.FK_DEBUG_SPINE === '1') {
+          console.log('[SpineElement] built animSchedule in render fallback, size=%d', schedule.length)
+        }
+      }
+    }
+    // 过滤不在骨骼中的动画名称，避免异常
     if (schedule && schedule.length > 0) {
+      try {
+        const available = new Set(
+          (drawable?.skeleton?.data?.animations || []).map(a => a?.name || a?.id).filter(Boolean)
+        )
+        const filtered = []
+        for (const evt of schedule) {
+          const nm = evt?.name
+          const act = evt?.action || 'set'
+          if (act === 'set' && nm && !available.has(nm)) {
+            continue
+          }
+          filtered.push(evt)
+        }
+        if (filtered.length !== schedule.length) {
+          schedule = filtered
+          this.config.animSchedule = filtered
+          if (process.env.FK_DEBUG_SPINE === '1') {
+            console.log('[SpineElement] filtered schedule by available animations, size=%d', filtered.length)
+          }
+        }
+      } catch (_) {}
+    }
+    // 并行段的首帧：若存在基础循环动画，确保其被设置
+    if (wasFirstFrame && schedule && schedule.length > 0) {
+      try {
+        const baseLoop = schedule.find(evt => (evt.action || 'set') === 'set' && evt.track === 0 && !!evt.loop && evt.name)
+        if (baseLoop) {
+          const as = drawable.animationState
+          as.setAnimation(0, baseLoop.name, true)
+        }
+      } catch (_) {}
+    }
+    if (schedule && schedule.length > 0) {
+      if (process.env.FK_DEBUG_SPINE === '1') {
+        console.log('[SpineElement] schedule detected, size=%d, now=%s', schedule.length, (time - (this.startTime || 0)).toFixed ? (time - (this.startTime || 0)).toFixed(3) : (time - (this.startTime || 0)))
+      }
       const now = (time - (this.startTime || 0))
       for (let i = 0; i < schedule.length; i++) {
         const evt = schedule[i] || {}
@@ -308,92 +423,153 @@ export class SpineElement extends BaseElement {
         const mix = evt.mix || evt.defaultMix || null
         const keyStart = `start:${i}`
         const keyEnd = `end:${i}`
-        if (mix != null && spine.stateData) {
-          spine.stateData.defaultMix = mix
-        }
+        
         if (!this._appliedSchedule.has(keyStart) && now >= start && name) {
+          const as = drawable.animationState
+          let te = null
           if (action === 'add') {
-            spine.state.addAnimation(track, name, loop, delay)
+            te = as.addAnimation(track, name, loop, delay)
           } else if (action === 'empty') {
-            spine.state.setEmptyAnimation(track, mix || 0)
+            as.setEmptyAnimation(track, mix || 0)
           } else {
-            spine.state.setAnimation(track, name, loop)
+            te = as.setAnimation(track, name, loop)
+          }
+          
+          if (process.env.FK_DEBUG_SPINE === '1') {
+            console.log('[SpineElement] apply start evt: track=%d name=%s start=%s loop=%s', track, name, start, loop)
           }
           this._appliedSchedule.add(keyStart)
         }
         if (end != null && !this._appliedSchedule.has(keyEnd) && now >= end) {
-          spine.state.setEmptyAnimation(track, mix || 0)
+          const as = drawable.animationState
+          as.setEmptyAnimation(track, mix || 0)
+          if (process.env.FK_DEBUG_SPINE === '1') {
+            console.log('[SpineElement] apply end evt: track=%d end=%s mix=%s', track, end, mix)
+          }
           this._appliedSchedule.add(keyEnd)
         }
       }
     }
 
-    const fitMode = this.config.fit || 'contain'
-    const baseScale = this.config.scale || 1
-    spine.scale.set(baseScale)
-    app.renderer.render(app.stage)
-    let b1 = null
-    try { b1 = spine.getBounds() } catch (_) {}
-    let bw = (b1 && b1.width > 0) ? b1.width : (naturalW || containerWidth)
-    let bh = (b1 && b1.height > 0) ? b1.height : (naturalH || containerHeight)
-    let uni = 1
-    let sx = containerWidth / (bw || 1)
-    let sy = containerHeight / (bh || 1)
-    if (fitMode === 'contain') {
-      uni = Math.min(sx, sy)
-      spine.scale.set(baseScale * uni)
-    } else if (fitMode === 'cover') {
-      uni = Math.max(sx, sy)
-      spine.scale.set(baseScale * uni)
-    } else if (fitMode === 'fill') {
-      spine.scale.set(baseScale * sx, baseScale * sy)
+    // 首帧（并行段的第一帧）按绝对时间预滚到正确姿态
+    if (wasFirstFrame) {
+      const elapsed = Math.max(0, (time - (this.startTime || 0))) * timeScale
+      if (elapsed > 0) {
+        try { drawable.update(elapsed) } catch (_) {}
+      }
+    } else if (delta > 0) {
+      drawable.update(delta * timeScale)
+    } else if (delta < 0) {
+      try {
+        if (drawable.animationState?.clearTracks) drawable.animationState.clearTracks()
+        this._appliedSchedule.clear()
+      } catch (_) {}
+    }
+
+    this._lastTime = time
+
+    const fitFrom = (state.fitFrom !== undefined ? state.fitFrom : this.config.fitFrom) || 'natural'
+    let curW = null
+    let curH = null
+    let bw = (naturalW && naturalW > 2 ? naturalW : ((this._ck.setupW && this._ck.setupW > 2) ? this._ck.setupW : containerWidth))
+    let bh = (naturalH && naturalH > 2 ? naturalH : ((this._ck.setupH && this._ck.setupH > 2) ? this._ck.setupH : containerHeight))
+    let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY, maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY
+    let hasBounds = false
+    try {
+      const drawOrder = drawable.skeleton.drawOrder
+      let positions = Utils.newFloatArray(100)
+      for (let i = 0, n = drawOrder.length; i < n; i++) {
+        const slot = drawOrder[i]
+        const attachment = slot.getAttachment()
+        if (attachment instanceof RegionAttachment) {
+          if (positions.length < 8) positions = Utils.newFloatArray(8)
+          attachment.computeWorldVertices(slot, positions, 0, 2)
+          for (let ii = 0; ii < 8; ii += 2) { const x = positions[ii]; const y = positions[ii+1]; minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y) }
+        } else if (attachment instanceof MeshAttachment) {
+          const len = attachment.worldVerticesLength
+          if (positions.length < len) positions = Utils.newFloatArray(len)
+          attachment.computeWorldVertices(slot, 0, len, positions, 0, 2)
+          for (let ii = 0; ii < len; ii += 2) { const x = positions[ii]; const y = positions[ii+1]; minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y) }
+        }
+      }
+      if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) { hasBounds = true; curW = Math.max(1, maxX - minX); curH = Math.max(1, maxY - minY) }
+    } catch (_) {}
+    if (fitFrom === 'dynamic' && hasBounds && curW && curH) {
+      bw = curW
+      bh = curH
+    }
+    let sX = 1
+    let sY = 1
+    let manualScale = (state.scale !== undefined ? state.scale : this.config.scale)
+    if (typeof manualScale === 'number') {
+      sX = manualScale
+      sY = manualScale
+    } else if (Array.isArray(manualScale)) {
+      sX = Number(manualScale[0]) || 1
+      sY = Number(manualScale[1]) || 1
+    } else if (manualScale && typeof manualScale === 'object') {
+      sX = Number(manualScale.x ?? manualScale.sx) || 1
+      sY = Number(manualScale.y ?? manualScale.sy) || 1
     } else {
-      spine.scale.set(baseScale)
+      sX = 1
+      sY = 1
     }
     if (process.env.FK_DEBUG_SPINE === '1') {
-      console.log('[SpineElement] fit=%s container=%dx%d bounds=%dx%d scale=%s', fitMode, containerWidth, containerHeight, bw, bh, fitMode === 'fill' ? `${baseScale * sx}x${baseScale * sy}` : `${baseScale * uni}`)
+      console.log('[SpineElement] scale=%sx%s container=%dx%d bounds=%dx%d', sX, sY, containerWidth, containerHeight, bw, bh)
     }
-    spine.x = containerWidth / 2
-    let targetY
-    const valign = (this.config.valign || 'bottom')
+    const targetX = containerWidth / 2
+    const valign = (state.valign !== undefined ? state.valign : this.config.valign) || 'bottom'
+    let alignY
+    const halfH = (naturalH || bh) / 2
     if (valign === 'bottom') {
-      targetY = containerHeight
+      alignY = containerHeight - sY * halfH
     } else if (valign === 'top') {
-      targetY = 0
+      alignY = sY * halfH
     } else {
-      targetY = containerHeight / 2
+      alignY = containerHeight / 2
     }
 
-    app.renderer.render(app.stage)
-    try {
-      const b = spine.getBounds()
-      if (b && b.width > 0 && b.height > 0) {
-        const bcx = b.x + b.width / 2
-        const bcy = b.y + b.height / 2
-        const targetX = containerWidth / 2
-        let alignY = targetY
-        if (valign === 'bottom') alignY = containerHeight - b.height / 2
-        else if (valign === 'top') alignY = b.height / 2
-        const dx = targetX - bcx
-        const dy = alignY - bcy
-        spine.x += dx
-        spine.y += dy
-      }
-    } catch (_) {}
-    app.renderer.resize(containerWidth, containerHeight)
-    if (app?.renderer?.gl && typeof app.renderer.gl.clearColor === 'function') {
-      app.renderer.gl.clearColor(0, 0, 0, 0)
+    if (!this._ck.surface || containerWidth !== this._ck._w || containerHeight !== this._ck._h) {
+      if (this._ck.surface && typeof this._ck.surface.delete === 'function') this._ck.surface.delete()
+      this._ck.surface = CanvasKit.MakeSurface(containerWidth, containerHeight)
+      this._ck.canvas = this._ck.surface.getCanvas()
+      this._ck._w = containerWidth
+      this._ck._h = containerHeight
     }
-    app.renderer.render(app.stage)
-    const buf = app.renderer.view.toBuffer('image/png')
+    const skCanvas = this._ck.canvas
+    skCanvas.clear(CanvasKit.Color(0, 0, 0, 0))
+    let tx = targetX - sX * (naturalCx || 0)
+    let ty = alignY - sY * (naturalCy || 0)
+    const left = sX * (isFinite(minX) ? minX : 0) + tx
+    const right = sX * (isFinite(maxX) ? maxX : 0) + tx
+    const top = sY * (isFinite(minY) ? minY : 0) + ty
+    const bottom = sY * (isFinite(maxY) ? maxY : 0) + ty
+    const clamp = ((state.clampToContainer !== undefined ? state.clampToContainer : this.config.clampToContainer) || false)
+    if (clamp) {
+      let dx = 0, dy = 0
+      if (left < 0 && right <= containerWidth) dx = -left
+      else if (right > containerWidth && left >= 0) dx = containerWidth - right
+      if (top < 0 && bottom <= containerHeight) dy = -top
+      else if (bottom > containerHeight && top >= 0) dy = containerHeight - bottom
+      tx += dx
+      ty += dy
+    }
+    skCanvas.save()
+    skCanvas.translate(tx, ty)
+    skCanvas.scale(sX, sY)
+    renderer.render(skCanvas, drawable)
+    skCanvas.restore()
+    if (typeof this._ck.surface.flush === 'function') this._ck.surface.flush()
+    const snapshot = this._ck.surface.makeImageSnapshot()
+    const buf = snapshot.encodeToBytes()
+    try { snapshot.delete && snapshot.delete() } catch (_) {}
 
-    const img = new Image()
-    img.src = buf
-    const canvas = p.createCanvas(containerWidth, containerHeight)
-    const ctx = canvas.getContext('2d')
+    const img = Buffer.isBuffer(buf) ? await loadImage(buf) : await loadImage(Buffer.from(buf))
+    const outCanvas = p.createCanvas(containerWidth, containerHeight)
+    const ctx = outCanvas.getContext('2d')
     ctx.clearRect(0, 0, containerWidth, containerHeight)
     ctx.drawImage(img, 0, 0, containerWidth, containerHeight)
-    const raster = new p.Raster(canvas)
+    const raster = new p.Raster(outCanvas)
     raster.position = new p.Point(pos.x, pos.y)
 
     const sourceWidth = img.width || containerWidth
@@ -406,9 +582,24 @@ export class SpineElement extends BaseElement {
       raster.size = new p.Size(containerWidth, containerHeight)
     }
 
-    this.applyTransform(raster, state, { applyPosition: false, paperInstance: p })
-    if (layer) layer.addChild(raster)
-    this._callOnRender(time, raster, { paper: p, project })
-    return raster
+    let finalItem = raster
+    const bg = (state.bgcolor !== undefined ? state.bgcolor : this.config.bgcolor)
+    if (bg) {
+      const rect = new p.Path.Rectangle({
+        rectangle: new p.Rectangle(
+          new p.Point(pos.x - containerWidth / 2, pos.y - containerHeight / 2),
+          new p.Size(containerWidth, containerHeight)
+        )
+      })
+      rect.fillColor = bg
+      rect.strokeWidth = 0
+      const group = new p.Group([rect, raster])
+      finalItem = group
+    }
+
+    this.applyTransform(finalItem, state, { applyPosition: false, paperInstance: p })
+    if (layer) layer.addChild(finalItem)
+    this._callOnRender(time, finalItem, { paper: p, project })
+    return finalItem
   }
 }
