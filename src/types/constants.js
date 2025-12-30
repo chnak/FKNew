@@ -233,6 +233,26 @@ export const DEFAULT_SPRITE_CONFIG = {
   startPosition: undefined,
 };
 
+export const DEFAULT_SPINE_CONFIG = {
+  ...DEFAULT_ELEMENT_CONFIG,
+  dir: '',
+  skeleton: '',
+  atlas: '',
+  role: null,
+  prefer: 'alien',
+  timeline: null,
+  animationPlayMode: 'sequence',
+  sequenceLoop: false,
+  animSchedule: null,
+  loop: true,
+  scale: 1,
+  timeScale: 1,
+  fitFrom: 'natural',
+  clampToContainer: false,
+  bgcolor: null,
+  valign: 'middle',
+};
+
 export const DEFAULT_JSON_CONFIG = {
   ...DEFAULT_ELEMENT_CONFIG,
   src: '',

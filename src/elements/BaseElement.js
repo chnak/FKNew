@@ -27,13 +27,12 @@ export function normalizeAnimationConfig(animConfig) {
   // 如果是动画实例，提取其配置信息（避免循环引用）
   if (animConfig && typeof animConfig.getStateAtTime === 'function') {
     const config = {};
-    // 提取所有可序列化的属性
     if (animConfig.type) config.type = animConfig.type;
-    if (animConfig.duration !== undefined) config.duration = animConfig.duration;
-    if (animConfig.delay !== undefined) config.delay = animConfig.delay;
+    if (animConfig.config && animConfig.config.duration !== undefined) config.duration = animConfig.config.duration;
+    if (animConfig.config && animConfig.config.delay !== undefined) config.delay = animConfig.config.delay;
     if (animConfig.startTime !== undefined) config.startTime = animConfig.startTime;
-    if (animConfig.easing) config.easing = animConfig.easing;
-    if (animConfig.property) config.property = animConfig.property;
+    if (animConfig.config && animConfig.config.easing !== undefined) config.easing = animConfig.config.easing;
+    if (animConfig.property !== undefined) config.property = animConfig.property;
     if (animConfig.from !== undefined) config.from = animConfig.from;
     if (animConfig.to !== undefined) config.to = animConfig.to;
     if (animConfig.fromOpacity !== undefined) config.fromOpacity = animConfig.fromOpacity;

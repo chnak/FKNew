@@ -321,20 +321,18 @@ export class TextElement extends BaseElement {
       pointText.justification = 'left';
     }
 
-    // 处理 anchor（Paper.js 使用 justification 和 baseline）
-    // 对于分割文本片段，使用 segmentBaseline（因为位置已经手动计算好了）
-    // 对于普通文本，根据 anchor 设置 baseline
-    if (segmentBaseline !== null) {
-      pointText.baseline = segmentBaseline;
+    // 位置对齐：根据文本实际边界和 anchor 调整，使 x/y 表示边界中心
+    // 注意：PointText 的 position 表示边界中心，point 表示文本锚点
+    const boundsForAlign = pointText.bounds;
+    const textW = boundsForAlign.width;
+    const textH = boundsForAlign.height;
+    const anchor = state.anchor || [0.5, 0.5];
+    if (anchor[0] === 0.5 && anchor[1] === 0.5) {
+      pointText.position = new p.Point(x, y);
     } else {
-      const anchor = state.anchor || [0.5, 0.5];
-      if (anchor[1] === 0.5) {
-        pointText.baseline = 'middle';
-      } else if (anchor[1] === 1) {
-        pointText.baseline = 'bottom';
-      } else {
-        pointText.baseline = 'top';
-      }
+      const centerX = x + textW * (0.5 - anchor[0]);
+      const centerY = y + textH * (0.5 - anchor[1]);
+      pointText.position = new p.Point(centerX, centerY);
     }
     
     // 应用渐变或普通颜色
